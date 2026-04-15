@@ -46,7 +46,7 @@ ABA_DADOS       = "DADOS COLETADOS"
 
 # Google Drive
 DRIVE_API_KEY       = os.environ.get("DRIVE_API_KEY", "AIzaSyATY3YHzzMJTB92heZcIxIJBGpK5Y2Ff6A")
-DRIVE_ROOT_FOLDER   = os.environ.get("DRIVE_ROOT_FOLDER", "1yrBYApnWeKee7YEJT7I6C1c5JgeDFpCj")
+DRIVE_ROOT_FOLDER   = os.environ.get("DRIVE_ROOT_FOLDER", "1yrBYApnWeKEe7YEJT7I6Clc5JgeDFpCj")
 DRIVE_BASE_URL      = "https://www.googleapis.com/drive/v3"
 DRIVE_VIEW_URL      = "https://drive.google.com/uc?export=view&id="
 
