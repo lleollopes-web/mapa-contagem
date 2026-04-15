@@ -48,7 +48,7 @@ ABA_DADOS       = "DADOS COLETADOS"
 DRIVE_API_KEY       = os.environ.get("DRIVE_API_KEY", "AIzaSyATY3YHzzMJTB92heZcIxIJBGpK5Y2Ff6A")
 DRIVE_ROOT_FOLDER   = os.environ.get("DRIVE_ROOT_FOLDER", "1yrBYApnWeKEe7YEJT7I6Clc5JgeDFpCj")
 DRIVE_BASE_URL      = "https://www.googleapis.com/drive/v3"
-DRIVE_VIEW_URL      = "https://drive.google.com/uc?export=view&id="
+DRIVE_VIEW_URL      = "https://lh3.googleusercontent.com/d/"
 
 # Cache de 10 minutos para não bater na API a cada clique
 _cache_fotos: dict = {}
