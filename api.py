@@ -20,9 +20,26 @@ except ImportError:
     raise SystemExit("Instale: pip install pandas openpyxl")
 
 # ── Configuração ──────────────────────────────────────────────────────────────
-BASE_DIR        = Path(__file__).parent
-EXCEL_PATH      = BASE_DIR / "PONTOS_DE_CONTAGEM_DE_TRÁFEGO.xlsx"
-HTML_PATH       = BASE_DIR / "mapa.html"
+BASE_DIR  = Path(__file__).parent
+HTML_PATH = BASE_DIR / "mapa.html"
+
+def encontrar_excel():
+    candidatos = [
+        "PONTOS_DE_CONTAGEM_DE_TR\u00c1FEGO.xlsx",
+        "PONTOS DE CONTAGEM DE TR\u00c1FEGO.xlsx",
+        "PONTOS_DE_CONTAGEM_DE_TRAFEGO.xlsx",
+        "PONTOS DE CONTAGEM DE TRAFEGO.xlsx",
+    ]
+    for nome in candidatos:
+        p = BASE_DIR / nome
+        if p.exists():
+            return p
+    xlsx = list(BASE_DIR.glob("*.xlsx"))
+    if xlsx:
+        return xlsx[0]
+    return BASE_DIR / "PONTOS_DE_CONTAGEM_DE_TR\u00c1FEGO.xlsx"
+
+EXCEL_PATH = encontrar_excel()
 
 ABA_PONTOS      = "LISTA DE PONTOS"
 ABA_DADOS       = "DADOS COLETADOS"
