@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: mapa-contagem-trafego
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DRIVE_API_KEY
+        value: AIzaSyATY3YHzzMJTB92heZcIxIJBGpK5Y2Ff6A
+      - key: DRIVE_ROOT_FOLDER
+        value: 17NN4Nl3MEBDiCF9jtinT2WZCGzmHGawL
