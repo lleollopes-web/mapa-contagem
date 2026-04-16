@@ -13,10 +13,7 @@ header { background:linear-gradient(90deg,#1a3a6b,#1565c0); padding:10px 20px; d
 header h1 { font-size:15px; font-weight:700; color:#fff; }
 header span { font-size:12px; color:#bbdefb; }
 #controls { background:#fff; padding:8px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #ddd; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
-#mode-toggle { display:flex; background:#f0f4ff; border-radius:20px; padding:3px; gap:3px; }
-.mode-btn { padding:4px 12px; border-radius:16px; border:none; font-size:12px; cursor:pointer; font-weight:600; color:#555; background:transparent; transition:all 0.2s; }
-.mode-btn.active { background:#1565c0; color:#fff; }
-.sep { width:1px; height:28px; background:#e0e0e0; flex-shrink:0; }
+
 .legend-item { display:flex; align-items:center; gap:6px; cursor:pointer; padding:4px 10px; border-radius:20px; border:2px solid transparent; transition:all 0.2s; font-size:12px; font-weight:600; color:#444; }
 .legend-item:hover { background:#f0f4ff; }
 .legend-item.active { border-color:#1565c0; background:#e8f0fe; }
@@ -176,21 +173,9 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   <span id="header-info">Carregando...<span id="atualizado"></span></span>
 </header>
 <div id="controls">
-  <div id="mode-toggle">
-    <button class="mode-btn active" id="btn-resp" onclick="setMode('resp')">Por Respons&#225;vel</button>
-    <button class="mode-btn" id="btn-st" onclick="setMode('st')">Por Status</button>
-  </div>
-  <div class="sep"></div>
-  <div id="filter-resp" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <div class="legend-item active" data-group="ALL" onclick="filterGroup('ALL')">
-      <div class="dot" style="background:#555"></div>
-      Todos <span class="count-badge" id="cnt-ALL">-</span>
-    </div>
-    <div class="legend-item active" data-group="ENGEVIAS" onclick="filterGroup('ENGEVIAS')"><div class="dot" style="background:#1565c0"></div>ENGEVIAS <span class="count-badge" id="cnt-ENGEVIAS">-</span></div>
-    <div class="legend-item active" data-group="COMOL"    onclick="filterGroup('COMOL')"   ><div class="dot" style="background:#2e7d32"></div>COMOL <span class="count-badge" id="cnt-COMOL">-</span></div>
-    <div class="legend-item active" data-group="DETRAN"   onclick="filterGroup('DETRAN')"  ><div class="dot" style="background:#e65100"></div>DETRAN <span class="count-badge" id="cnt-DETRAN">-</span></div>
-  </div>
-  <div id="status-legend">
+
+
+  <div id="status-legend" style="display:flex;">
     <div class="st-item"><div class="st-dot" style="background:#2e7d32"></div>Conclu&#237;do</div>
     <div class="st-item"><div class="st-dot" style="background:#f9a825"></div>Em Andamento</div>
     <div class="st-item"><div class="st-dot" style="background:#c62828"></div>N&#227;o Iniciado</div>
@@ -437,10 +422,8 @@ function closePanel(){
 function refreshColors(){allMarkers.forEach(function(m){m.mk.setIcon(makeIcon(corPonto(m.p),false));});}
 function setMode(mode){
   colorMode=mode;
-  document.getElementById('btn-resp').classList.toggle('active',mode==='resp');
-  document.getElementById('btn-st').classList.toggle('active',mode==='st');
-  document.getElementById('filter-resp').style.display=mode==='resp'?'flex':'none';
-  document.getElementById('status-legend').style.display=mode==='st'?'flex':'none';
+
+
   closePanel();refreshColors();
 }
 function filterGroup(g){
