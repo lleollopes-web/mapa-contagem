@@ -269,11 +269,36 @@ def get_ponto(pid: str):
         if p["id"] == pid: return JSONResponse(p)
     raise HTTPException(404, f"Ponto '{pid}' não encontrado")
 
+def encontrar_xlsx_drive(pid: str) -> Optional[str]:
+    """Encontra o arquivo .xlsx na pasta do ponto no Drive e retorna URL de download."""
+    now = time.time()
+    # Reutiliza cache de subpastas
+    if "root_items" not in _cache_subpastas or (now - _cache_timestamp.get("root", 0)) > CACHE_TTL:
+        items = drive_list(DRIVE_ROOT_FOLDER)
+        _cache_subpastas["root_items"] = {
+            i["name"]: i["id"] for i in items
+            if i["mimeType"] == "application/vnd.google-apps.folder"
+        }
+        _cache_timestamp["root"] = now
+    pasta_ponto_id = _cache_subpastas["root_items"].get(pid)
+    if not pasta_ponto_id:
+        return None
+    # Lista arquivos direto na pasta do ponto (não subpasta)
+    items = drive_list(pasta_ponto_id)
+    for item in items:
+        if (item.get("mimeType","") in
+            {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             "application/vnd.ms-excel"}
+            or item.get("name","").endswith(".xlsx")):
+            return f"https://drive.google.com/uc?export=download&id={item['id']}"
+    return None
+
 @app.get("/api/fotos/{pid}")
 def get_fotos(pid: str):
-    """Retorna fotos de um ponto sob demanda — chamado apenas ao clicar no marcador"""
+    """Retorna fotos e link do xlsx de um ponto sob demanda"""
     fotos = listar_fotos_drive(pid)
-    return JSONResponse({"pid": pid, "fotos": fotos, "total": len(fotos)})
+    xlsx  = encontrar_xlsx_drive(pid)
+    return JSONResponse({"pid": pid, "fotos": fotos, "total": len(fotos), "xlsx": xlsx})
 
 @app.post("/api/upload-excel")
 async def upload_excel(file: UploadFile = File(...)):

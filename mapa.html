@@ -133,6 +133,21 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 }
 #login-btn:hover { opacity:0.9; }
 #login-footer { margin-top:20px; font-size:11px; color:#ccc; }
+
+/* ── Botão Download xlsx ── */
+.download-btn {
+  display:inline-flex; align-items:center; gap:8px; margin-top:14px;
+  padding:10px 18px; background:linear-gradient(90deg,#1b5e20,#2e7d32);
+  color:#fff; border:none; border-radius:10px; font-size:13px; font-weight:700;
+  cursor:pointer; text-decoration:none; transition:opacity 0.2s;
+  width:100%; justify-content:center; box-sizing:border-box;
+}
+.download-btn:hover { opacity:0.88; }
+.download-sem-xlsx {
+  display:flex; align-items:center; gap:8px; margin-top:14px;
+  padding:10px 16px; background:#fff8e1; border:1px solid #ffe082;
+  border-radius:10px; font-size:12px; font-weight:600; color:#f57f17;
+}
 </style>
 </head>
 <body>
@@ -290,7 +305,25 @@ function buildContagem(p){
     });
     html+='</div>';
   });
+  // Placeholder do botão download — será preenchido pelo fetch de fotos
+  html += '<div id="xlsx-download-area"></div>';
   return html;
+}
+function renderXlsxBtn(xlsx, pid) {
+  var area = document.getElementById('xlsx-download-area');
+  if (!area) return;
+  if (xlsx) {
+    var nome = pid + ' - 15MIN.xlsx';
+    area.innerHTML =
+      '<a class="download-btn" href="'+xlsx+'" target="_blank" download="'+nome+'">'+
+        '&#128229; Baixar planilha de contagem (15min)'+
+      '</a>';
+  } else {
+    area.innerHTML =
+      '<div class="download-sem-xlsx">'+
+        '&#9888;&#65039; Planilha de contagem ainda não disponível'+
+      '</div>';
+  }
 }
 function renderCarr(idx){
   if(!carrFotos.length) return;
@@ -368,6 +401,8 @@ function showPanel(p){
     .then(function(r){return r.json();})
     .then(function(d){
       carrFotos=d.fotos||[];
+      // Renderiza botão xlsx na aba contagem
+      renderXlsxBtn(d.xlsx||null, p.id);
       var fotosHtml='<div class="fotos-section">';
       if(carrFotos.length>0){
         fotosHtml+='<div class="fotos-titulo">Fotos de Instala\u00e7\u00e3o <b>'+carrFotos.length+' foto(s)</b></div>'+
