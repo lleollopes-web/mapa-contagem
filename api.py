@@ -68,17 +68,25 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # ── Google Drive helpers ──────────────────────────────────────────────────────
 def drive_list(folder_id: str) -> list:
-    """Lista arquivos/pastas dentro de uma pasta do Drive."""
+    """Lista arquivos/pastas dentro de uma pasta do Drive, paginando todos os resultados."""
     q = urllib.parse.quote(f"'{folder_id}' in parents and trashed=false")
-    fields = "files(id,name,mimeType)"
-    url = f"{DRIVE_BASE_URL}/files?q={q}&key={DRIVE_API_KEY}&fields={fields}&pageSize=100"
-    try:
-        resp = urllib.request.urlopen(url, timeout=10)
-        data = json.loads(resp.read())
-        return data.get("files", [])
-    except Exception as e:
-        print(f"Drive API erro: {e}")
-        return []
+    fields = urllib.parse.quote("nextPageToken,files(id,name,mimeType)")
+    all_files = []
+    page_token = ""
+    while True:
+        token_param = f"&pageToken={urllib.parse.quote(page_token)}" if page_token else ""
+        url = f"{DRIVE_BASE_URL}/files?q={q}&key={DRIVE_API_KEY}&fields={fields}&pageSize=1000{token_param}"
+        try:
+            resp = urllib.request.urlopen(url, timeout=15)
+            data = json.loads(resp.read())
+            all_files.extend(data.get("files", []))
+            page_token = data.get("nextPageToken", "")
+            if not page_token:
+                break
+        except Exception as e:
+            print(f"Drive API erro: {e}")
+            break
+    return all_files
 
 def encontrar_pasta_id(parent_id: str, nome_busca: str) -> Optional[str]:
     """Encontra ID de uma subpasta pelo nome (case-insensitive, aceita variações)."""
