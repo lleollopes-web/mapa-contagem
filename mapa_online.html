@@ -159,7 +159,7 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 
 <script>
 // !! CONFIGURE AQUI O ENDEREÇO DO SEU SERVIDOR !!
-var API_BASE = '';  // vazio = mesmo servidor; ou coloque ex: 'http://192.168.1.10:8000'
+var API_BASE = '';  // porta 8080 — se acessar de outro PC troque por 'http://IP_DO_SERVIDOR:8080'  // vazio = mesmo servidor; ou coloque ex: 'http://192.168.1.10:8000'
 
 var CORES_SUG = {"ENGEVIAS":"#1565c0","COMOL":"#2e7d32","DETRAN":"#e65100"};
 var CORES_ST  = {"CONCLUIDO":"#2e7d32","EM ANDAMENTO":"#f9a825","NAO INICIADO":"#c62828","NAO":"#c62828","SIM":"#2e7d32"};
@@ -284,7 +284,7 @@ document.addEventListener('keydown',function(e){
 });
 function showPanel(p){
   document.getElementById('panel-title').textContent='Trecho '+p.id+' \u00b7 '+p.rodovia;
-  carrFotos=p.fotos||[];carrIdx=0;
+  carrFotos=[];carrIdx=0;
   var corResp=CORES_SUG[p.sugestao]||'#333';
   document.getElementById('tab-info').innerHTML=
     '<div class="row"><span class="lbl">C\u00f3digo</span><span class="val">'+p.trecho+'</span></div>'+
@@ -297,29 +297,46 @@ function showPanel(p){
     '<div class="row"><span class="lbl">Coordenadas</span><span class="val">'+p.lat.toFixed(6)+', '+p.lng.toFixed(6)+'</span></div>'+
     '<a class="gmaps-link" href="https://www.google.com/maps?q='+p.lat+','+p.lng+'" target="_blank">&#128506; Abrir no Google Maps &#8599;</a>';
   document.getElementById('tab-contagem').innerHTML=buildContagem(p);
-  var fotosHtml='<div class="fotos-section">';
-  if(carrFotos.length>0){
-    fotosHtml+='<div class="fotos-titulo">Fotos de Instala\u00e7\u00e3o <b>'+carrFotos.length+' foto(s)</b></div>'+
-      '<div class="carrossel">'+
-        '<img id="carr-img" src="'+API_BASE+carrFotos[0]+'" alt="" onclick="openLb()" style="display:block">'+
-        '<button class="carr-btn carr-prev" id="carr-prev" onclick="carrNav(-1)" style="display:'+(carrFotos.length>1?'flex':'none')+'">&#8249;</button>'+
-        '<button class="carr-btn carr-next" id="carr-next" onclick="carrNav(1)"  style="display:'+(carrFotos.length>1?'flex':'none')+'">&#8250;</button>'+
-      '</div><div class="carr-dots" id="carr-dots"></div>'+
-      '<div class="carr-counter" id="carr-counter">'+(carrFotos.length>1?'1 / '+carrFotos.length:'')+'</div>';
-  } else {
-    fotosHtml+='<div class="fotos-titulo">Fotos <b style="color:#e65100">0 foto(s)</b></div>'+
-      '<div class="carrossel"><div class="no-foto"><div class="no-foto-icon">&#128247;</div>'+
-      '<div class="no-foto-msg">CONTAGEM AINDA SER\u00c1 REALIZADA</div>'+
-      '<div class="no-foto-sub">Sem fotos dispon\u00edveis</div></div></div>';
-  }
-  fotosHtml+='</div>';
-  document.getElementById('tab-fotos').innerHTML=fotosHtml;
+  // Fotos: mostra loading e busca sob demanda
+  document.getElementById('tab-fotos').innerHTML=
+    '<div class="fotos-section"><div class="fotos-titulo">Fotos de Instala\u00e7\u00e3o <b>carregando...</b></div>'+
+    '<div class="carrossel"><div class="no-foto"><div class="spin" style="width:28px;height:28px;border:3px solid #e8f0fe;border-top:3px solid #1565c0;border-radius:50%;animation:spin 0.8s linear infinite"></div></div></div></div>';
   document.getElementById('info-panel').style.display='block';
-  if(carrFotos.length>1)buildDots();
   var cBtn=document.getElementById('tab-contagem-btn');
   cBtn.innerHTML=p.total&&p.total>0
     ?'&#128202; Contagem <span style="background:#1565c0;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;margin-left:3px">'+p.total.toLocaleString('pt-BR')+'</span>'
     :'&#128202; Contagem';
+  // Busca fotos sob demanda
+  fetch(API_BASE+'/api/fotos/'+encodeURIComponent(p.id))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      carrFotos=d.fotos||[];
+      var fotosHtml='<div class="fotos-section">';
+      if(carrFotos.length>0){
+        fotosHtml+='<div class="fotos-titulo">Fotos de Instala\u00e7\u00e3o <b>'+carrFotos.length+' foto(s)</b></div>'+
+          '<div class="carrossel">'+
+            '<img id="carr-img" src="'+carrFotos[0]+'" alt="" onclick="openLb()" style="display:block">'+
+            '<button class="carr-btn carr-prev" id="carr-prev" onclick="carrNav(-1)" style="display:'+(carrFotos.length>1?'flex':'none')+'">&#8249;</button>'+
+            '<button class="carr-btn carr-next" id="carr-next" onclick="carrNav(1)" style="display:'+(carrFotos.length>1?'flex':'none')+'">&#8250;</button>'+
+          '</div><div class="carr-dots" id="carr-dots"></div>'+
+          '<div class="carr-counter" id="carr-counter">'+(carrFotos.length>1?'1 / '+carrFotos.length:'')+'</div>';
+      } else {
+        fotosHtml+='<div class="fotos-titulo">Fotos <b style="color:#e65100">0 foto(s)</b></div>'+
+          '<div class="carrossel"><div class="no-foto"><div class="no-foto-icon">&#128247;</div>'+
+          '<div class="no-foto-msg">CONTAGEM AINDA SER\u00c1 REALIZADA</div>'+
+          '<div class="no-foto-sub">Sem fotos dispon\u00edveis</div></div></div>';
+      }
+      fotosHtml+='</div>';
+      document.getElementById('tab-fotos').innerHTML=fotosHtml;
+      if(carrFotos.length>1)buildDots();
+      var fBtn=document.getElementById('tab-fotos-btn');
+      fBtn.innerHTML=carrFotos.length>0
+        ?'&#128247; Fotos <span style="background:#2e7d32;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;margin-left:3px">'+carrFotos.length+'</span>'
+        :'&#128247; Fotos';
+    })
+    .catch(function(){
+      document.getElementById('tab-fotos').innerHTML='<div class="sem-contagem"><div class="sem-contagem-icon">&#128247;</div><div class="sem-contagem-msg">Erro ao carregar fotos</div></div>';
+    });
 }
 function closePanel(){
   document.getElementById('info-panel').style.display='none';

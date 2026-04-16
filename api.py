@@ -222,7 +222,7 @@ def ler_excel():
             "sugestao": g(c_sug) or "-",
             "status":   g(c_sta) or "-",
             "pista":    g(c_pis) or "-",
-            "fotos":    listar_fotos_drive(pid),
+            "fotos":    [],  # carregado sob demanda via /api/fotos/{pid}
             "total":           dc.get("total", 0),
             "periodo_inicio":  dc.get("periodo_inicio"),
             "periodo_fim":     dc.get("periodo_fim"),
@@ -255,6 +255,12 @@ def get_ponto(pid: str):
     for p in pontos:
         if p["id"] == pid: return JSONResponse(p)
     raise HTTPException(404, f"Ponto '{pid}' não encontrado")
+
+@app.get("/api/fotos/{pid}")
+def get_fotos(pid: str):
+    """Retorna fotos de um ponto sob demanda — chamado apenas ao clicar no marcador"""
+    fotos = listar_fotos_drive(pid)
+    return JSONResponse({"pid": pid, "fotos": fotos, "total": len(fotos)})
 
 @app.post("/api/upload-excel")
 async def upload_excel(file: UploadFile = File(...)):
