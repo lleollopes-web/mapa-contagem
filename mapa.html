@@ -488,8 +488,8 @@ function carregarPontos(){
       document.getElementById('loading').style.display='none';
       var pontos=data.pontos;
       document.getElementById('header-info').innerHTML=
-        pontos.length+' pontos &middot; '+data.com_contagem+' com dados &middot; '+data.com_fotos+' com fotos'+
-        '<span id="atualizado"> &middot; atualizado '+data.atualizado_em+'</span>';
+        pontos.length+' pontos &middot; '+data.com_contagem+' com dados'+
+        '<span id="atualizado"> &middot; Excel atualizado em: '+data.atualizado_em+'</span>';
       // Contagens por grupo
       var cnts={ALL:pontos.length,ENGEVIAS:0,COMOL:0,DETRAN:0};
       pontos.forEach(function(p){if(cnts[p.sugestao]!==undefined)cnts[p.sugestao]++;});

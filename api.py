@@ -5,7 +5,8 @@ Fotos servidas via Google Drive API (pastas públicas)
 
 import os, json, urllib.request, urllib.parse
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+BRASILIA = timezone(timedelta(hours=-3))
 from typing import Optional
 from functools import lru_cache
 import time
@@ -251,13 +252,12 @@ def get_pontos():
     pontos = ler_excel()
     excel = encontrar_excel()
     try:
-        excel_mtime = datetime.fromtimestamp(excel.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
+        excel_mtime = datetime.fromtimestamp(excel.stat().st_mtime, tz=BRASILIA).strftime("%d/%m/%Y %H:%M")
     except:
-        excel_mtime = datetime.now().strftime("%d/%m/%Y %H:%M")
+        excel_mtime = datetime.now(BRASILIA).strftime("%d/%m/%Y %H:%M")
     return JSONResponse({
         "total": len(pontos),
         "com_contagem": sum(1 for p in pontos if p["total"] > 0),
-        "com_fotos": sum(1 for p in pontos if p["fotos"]),
         "atualizado_em": excel_mtime,
         "pontos": pontos,
     })
@@ -309,7 +309,7 @@ async def upload_excel(file: UploadFile = File(...)):
     _cache_fotos.clear()
     _cache_subpastas.clear()
     _cache_timestamp.clear()
-    return {"ok": True, "atualizado_em": datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+    return {"ok": True, "atualizado_em": datetime.now(BRASILIA).strftime("%d/%m/%Y %H:%M:%S")}
 
 @app.get("/api/limpar-cache")
 def limpar_cache():
@@ -324,8 +324,8 @@ def status():
     return {
         "ok": True,
         "excel_existe": EXCEL_PATH.exists(),
-        "excel_modificado": datetime.fromtimestamp(EXCEL_PATH.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S") if EXCEL_PATH.exists() else None,
+        "excel_modificado": datetime.fromtimestamp(EXCEL_PATH.stat().st_mtime, tz=BRASILIA).strftime("%d/%m/%Y %H:%M:%S") if EXCEL_PATH.exists() else None,
         "drive_root": DRIVE_ROOT_FOLDER,
         "cache_pontos": len(_cache_fotos),
-        "servidor_hora": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "servidor_hora": datetime.now(BRASILIA).strftime("%d/%m/%Y %H:%M:%S"),
     }
