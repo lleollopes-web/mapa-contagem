@@ -249,11 +249,16 @@ def raiz():
 @app.get("/api/pontos")
 def get_pontos():
     pontos = ler_excel()
+    excel = encontrar_excel()
+    try:
+        excel_mtime = datetime.fromtimestamp(excel.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
+    except:
+        excel_mtime = datetime.now().strftime("%d/%m/%Y %H:%M")
     return JSONResponse({
         "total": len(pontos),
         "com_contagem": sum(1 for p in pontos if p["total"] > 0),
         "com_fotos": sum(1 for p in pontos if p["fotos"]),
-        "atualizado_em": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "atualizado_em": excel_mtime,
         "pontos": pontos,
     })
 
