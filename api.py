@@ -520,11 +520,14 @@ def download_resumo():
                 EXTS_FOTO_MIME = {"image/jpeg","image/png","image/webp","image/jpg"}
                 for fi in fotos_items:
                     if fi.get("mimeType","") in EXTS_FOTO_MIME:
-                        foto_url = f"https://lh3.googleusercontent.com/d/{fi['id']}"
+                        foto_url = f"https://drive.google.com/uc?export=download&id={fi['id']}&confirm=t"
                         break
 
             if foto_url:
-                req = urllib.request.urlopen(foto_url, timeout=20)
+                req_obj = urllib.request.Request(foto_url, headers={
+                    "User-Agent": "Mozilla/5.0"
+                })
+                req = urllib.request.urlopen(req_obj, timeout=20)
                 img_bytes = req.read()
                 tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
                 tmp.write(img_bytes)
