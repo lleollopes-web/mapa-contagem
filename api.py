@@ -3,7 +3,7 @@ api.py — Mapa de Contagem de Tráfego
 Fotos servidas via Google Drive API (pastas públicas)
 """
 
-import os, json, urllib.request, urllib.parse
+import os, json, urllib.request, urllib.parse, zipfile, io, tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 BRASILIA = timezone(timedelta(hours=-3))
@@ -17,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 try:
     import pandas as pd
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 except ImportError:
     raise SystemExit("Instale: pip install pandas openpyxl")
 
@@ -318,6 +320,187 @@ def limpar_cache():
     _cache_subpastas.clear()
     _cache_timestamp.clear()
     return {"ok": True, "msg": "Cache limpo"}
+
+@app.get("/api/download/zip-xlsx")
+def download_zip_xlsx():
+    """Baixa ZIP com todos os .xlsx dos pontos concluídos"""
+    from fastapi.responses import StreamingResponse
+
+    # Busca pontos concluídos
+    pontos = ler_excel()
+    concluidos = []
+    for p in pontos:
+        k = (p.get("status","")).upper().normalize("NFD") if hasattr((p.get("status","")).upper(), "normalize") else p.get("status","").upper()
+        import unicodedata
+        k = unicodedata.normalize("NFD", p.get("status","").upper())
+        k = "".join(c for c in k if unicodedata.category(c) != "Mn")
+        if "CONCLU" in k:
+            concluidos.append(p)
+
+    if not concluidos:
+        raise HTTPException(404, "Nenhum ponto concluído encontrado")
+
+    # Busca IDs das pastas no Drive
+    now = time.time()
+    if "root_items" not in _cache_subpastas or (now - _cache_timestamp.get("root", 0)) > CACHE_TTL:
+        items = drive_list(DRIVE_ROOT_FOLDER)
+        _cache_subpastas["root_items"] = {
+            i["name"]: i["id"] for i in items
+            if i["mimeType"] == "application/vnd.google-apps.folder"
+        }
+        _cache_timestamp["root"] = now
+
+    # Monta ZIP em memória
+    zip_buffer = io.BytesIO()
+    encontrados = 0
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in concluidos:
+            pid = p["id"]
+            pasta_id = _cache_subpastas["root_items"].get(pid)
+            if not pasta_id:
+                continue
+            # Lista arquivos na pasta do ponto
+            arquivos = drive_list(pasta_id)
+            for arq in arquivos:
+                mime = arq.get("mimeType", "")
+                nome = arq.get("name", "")
+                if (mime in {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             "application/vnd.ms-excel"}
+                    or nome.lower().endswith(".xlsx")):
+                    # Download do arquivo
+                    try:
+                        url = f"https://drive.google.com/uc?export=download&id={arq['id']}"
+                        req = urllib.request.urlopen(url, timeout=30)
+                        dados = req.read()
+                        zf.writestr(f"{pid}/{nome}", dados)
+                        encontrados += 1
+                    except Exception as e:
+                        print(f"Erro ao baixar {pid}/{nome}: {e}")
+
+    if encontrados == 0:
+        raise HTTPException(404, "Nenhum arquivo xlsx encontrado nos pontos concluídos")
+
+    zip_buffer.seek(0)
+    from datetime import datetime as dt
+    nome_zip = f"Contagens_Concluidas_{dt.now(BRASILIA).strftime('%d%m%Y')}.zip"
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={nome_zip}"}
+    )
+
+
+@app.get("/api/download/resumo-xlsx")
+def download_resumo():
+    """Gera planilha resumo dos pontos concluídos"""
+    from fastapi.responses import StreamingResponse
+    import unicodedata
+
+    pontos = ler_excel()
+    concluidos = []
+    for p in pontos:
+        k = unicodedata.normalize("NFD", p.get("status","").upper())
+        k = "".join(c for c in k if unicodedata.category(c) != "Mn")
+        if "CONCLU" in k:
+            concluidos.append(p)
+
+    if not concluidos:
+        raise HTTPException(404, "Nenhum ponto concluído encontrado")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Pontos Concluídos"
+
+    # Estilos
+    header_fill   = PatternFill("solid", fgColor="1565C0")
+    header_font   = Font(bold=True, color="FFFFFF", size=11)
+    center        = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left          = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    thin          = Side(style="thin", color="CCCCCC")
+    border        = Border(left=thin, right=thin, top=thin, bottom=thin)
+    green_fill    = PatternFill("solid", fgColor="E8F5E9")
+    green_font    = Font(bold=True, color="1B5E20", size=11)
+
+    # Título
+    ws.merge_cells("A1:I1")
+    ws["A1"] = "RELATÓRIO DE PONTOS DE CONTAGEM CONCLUÍDOS"
+    ws["A1"].font = Font(bold=True, color="FFFFFF", size=13)
+    ws["A1"].fill = PatternFill("solid", fgColor="0D47A1")
+    ws["A1"].alignment = center
+    ws.row_dimensions[1].height = 30
+
+    # Subtítulo
+    from datetime import datetime as dt
+    ws.merge_cells("A2:I2")
+    ws["A2"] = f"COMOL Consultoria M.L.  |  SOP-CE  |  Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}"
+    ws["A2"].font = Font(italic=True, color="555555", size=10)
+    ws["A2"].fill = PatternFill("solid", fgColor="E3F2FD")
+    ws["A2"].alignment = center
+    ws.row_dimensions[2].height = 18
+
+    # Cabeçalhos
+    headers = ["Nº", "Código
+Ponto", "Rodovia", "Descrição Início", "Descrição Fim",
+               "Latitude", "Longitude", "Período
+Início", "Período
+Fim"]
+    ws.row_dimensions[3].height = 36
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+        cell.border = border
+
+    # Larguras das colunas
+    widths = [5, 16, 10, 38, 38, 13, 13, 14, 14]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    # Dados
+    alt_fill = PatternFill("solid", fgColor="F5F5F5")
+    for idx, p in enumerate(concluidos, 1):
+        row = idx + 3
+        ws.row_dimensions[row].height = 22
+        fill = alt_fill if idx % 2 == 0 else PatternFill("solid", fgColor="FFFFFF")
+        valores = [
+            idx,
+            p.get("trecho",""),
+            p.get("rodovia",""),
+            p.get("inicio",""),
+            p.get("fim",""),
+            p.get("lat",""),
+            p.get("lng",""),
+            p.get("periodo_inicio") or "—",
+            p.get("periodo_fim")    or "—",
+        ]
+        for col, val in enumerate(valores, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.fill = fill
+            cell.border = border
+            cell.alignment = center if col in [1,2,3,6,7,8,9] else left
+            cell.font = Font(size=10)
+
+    # Totalizador
+    tot_row = len(concluidos) + 4
+    ws.merge_cells(f"A{tot_row}:F{tot_row}")
+    ws[f"A{tot_row}"] = f"TOTAL DE PONTOS CONCLUÍDOS: {len(concluidos)}"
+    ws[f"A{tot_row}"].font = green_font
+    ws[f"A{tot_row}"].fill = green_fill
+    ws[f"A{tot_row}"].alignment = center
+
+    # Salva em buffer
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    nome = f"Resumo_Contagens_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
 
 @app.get("/api/status")
 def status():

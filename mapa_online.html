@@ -145,6 +145,20 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   padding:10px 16px; background:#fff8e1; border:1px solid #ffe082;
   border-radius:10px; font-size:12px; font-weight:600; color:#f57f17;
 }
+
+/* ── Botões de Download ── */
+#download-bar { display:flex; gap:8px; align-items:center; margin-left:auto; }
+.dl-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 14px; border:none; border-radius:20px;
+  font-size:12px; font-weight:700; cursor:pointer;
+  text-decoration:none; transition:all 0.2s; white-space:nowrap;
+}
+.dl-btn-zip  { background:#1b5e20; color:#fff; }
+.dl-btn-xlsx { background:#1565c0; color:#fff; }
+.dl-btn-zip:hover  { background:#2e7d32; }
+.dl-btn-xlsx:hover { background:#1976d2; }
+.dl-btn.loading { opacity:0.6; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -180,6 +194,14 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     <div class="st-item"><div class="st-dot" style="background:#f9a825"></div>Em Andamento</div>
     <div class="st-item"><div class="st-dot" style="background:#c62828"></div>N&#227;o Iniciado</div>
     <div class="st-item"><div class="st-dot" style="background:#78909c"></div>Sem info</div>
+  </div>
+  <div id="download-bar">
+    <button class="dl-btn dl-btn-xlsx" onclick="downloadResumo(this)" title="Planilha resumo dos pontos concluídos">
+      &#128202; Resumo Concluídos
+    </button>
+    <button class="dl-btn dl-btn-zip" onclick="downloadZip(this)" title="ZIP com todos os xlsx dos pontos concluídos">
+      &#128229; Download Planilhas 15min
+    </button>
   </div>
   <input type="text" id="search-box" placeholder="&#128269; Buscar ID, rodovia..." oninput="searchPoints(this.value)">
 </div>
@@ -544,6 +566,65 @@ document.addEventListener('keydown', function(e) {
 // Mantém sessão durante a visita (fecha e reabre a aba exige login novamente)
 if (sessionStorage.getItem('autenticado') === '1') {
   document.getElementById('login-overlay').style.display = 'none';
+}
+
+
+function downloadResumo(btn) {
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Gerando...';
+  fetch(API_BASE + '/api/download/resumo-xlsx')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erro ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var hoje = new Date();
+      var dd = String(hoje.getDate()).padStart(2,'0');
+      var mm = String(hoje.getMonth()+1).padStart(2,'0');
+      var yy = hoje.getFullYear();
+      a.download = 'Resumo_Contagens_' + dd + mm + yy + '.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
+    })
+    .catch(function(e) {
+      alert('Erro ao gerar resumo: ' + e.message);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
+    });
+}
+
+function downloadZip(btn) {
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Baixando arquivos...';
+  fetch(API_BASE + '/api/download/zip-xlsx')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erro ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var hoje = new Date();
+      var dd = String(hoje.getDate()).padStart(2,'0');
+      var mm = String(hoje.getMonth()+1).padStart(2,'0');
+      var yy = hoje.getFullYear();
+      a.download = 'Contagens_Concluidas_' + dd + mm + yy + '.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128229; Download Planilhas 15min';
+    })
+    .catch(function(e) {
+      alert('Erro ao gerar ZIP: ' + e.message);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128229; Download Planilhas 15min';
+    });
 }
 
 </script>
