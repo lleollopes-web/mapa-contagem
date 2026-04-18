@@ -392,9 +392,12 @@ def download_zip_xlsx():
 
 @app.get("/api/download/resumo-xlsx")
 def download_resumo():
-    """Gera planilha resumo dos pontos concluídos"""
+    """Gera planilha resumo dos pontos concluidos com ID e foto"""
     from fastapi.responses import StreamingResponse
-    import unicodedata
+    from openpyxl.utils import get_column_letter
+    from openpyxl.drawing.image import Image as XLImage
+    from datetime import datetime as dt
+    import unicodedata, tempfile, os
 
     pontos = ler_excel()
     concluidos = []
@@ -405,42 +408,41 @@ def download_resumo():
             concluidos.append(p)
 
     if not concluidos:
-        raise HTTPException(404, "Nenhum ponto concluído encontrado")
+        raise HTTPException(404, "Nenhum ponto concluido encontrado")
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Pontos Concluídos"
+    ws.title = "Pontos Concluidos"
 
-    # Estilos
-    header_fill   = PatternFill("solid", fgColor="1565C0")
-    header_font   = Font(bold=True, color="FFFFFF", size=11)
-    center        = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    left          = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    thin          = Side(style="thin", color="CCCCCC")
-    border        = Border(left=thin, right=thin, top=thin, bottom=thin)
-    green_fill    = PatternFill("solid", fgColor="E8F5E9")
-    green_font    = Font(bold=True, color="1B5E20", size=11)
+    header_fill = PatternFill("solid", fgColor="1565C0")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    center      = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left        = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+    thin        = Side(style="thin", color="CCCCCC")
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    green_fill  = PatternFill("solid", fgColor="E8F5E9")
+    green_font  = Font(bold=True, color="1B5E20", size=11)
 
-    # Título
-    ws.merge_cells("A1:I1")
-    ws["A1"] = "RELATÓRIO DE PONTOS DE CONTAGEM CONCLUÍDOS"
+    NCOLS = 11
+
+    ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1")
+    ws["A1"] = "RELATORIO DE PONTOS DE CONTAGEM CONCLUIDOS"
     ws["A1"].font = Font(bold=True, color="FFFFFF", size=13)
     ws["A1"].fill = PatternFill("solid", fgColor="0D47A1")
     ws["A1"].alignment = center
     ws.row_dimensions[1].height = 30
 
-    # Subtítulo
-    from datetime import datetime as dt
-    ws.merge_cells("A2:I2")
+    ws.merge_cells(f"A2:{get_column_letter(NCOLS)}2")
     ws["A2"] = f"COMOL Consultoria M.L.  |  SOP-CE  |  Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}"
     ws["A2"].font = Font(italic=True, color="555555", size=10)
     ws["A2"].fill = PatternFill("solid", fgColor="E3F2FD")
     ws["A2"].alignment = center
     ws.row_dimensions[2].height = 18
 
-    # Cabecalhos
-    headers = ["N", "Codigo Ponto", "Rodovia", "Descricao Inicio", "Descricao Fim",
-               "Latitude", "Longitude", "Periodo Inicio", "Periodo Fim"]
+    headers = ["N", "ID Ponto", "Codigo Trecho", "Rodovia",
+               "Descricao Inicio", "Descricao Fim",
+               "Latitude", "Longitude",
+               "Periodo Inicio", "Periodo Fim", "Foto"]
     ws.row_dimensions[3].height = 36
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col, value=h)
@@ -449,48 +451,78 @@ def download_resumo():
         cell.alignment = center
         cell.border = border
 
-    # Larguras das colunas (usando letra direta para evitar MergedCell)
-    from openpyxl.utils import get_column_letter
-    widths = [5, 16, 10, 38, 38, 13, 13, 14, 14]
+    widths = [5, 10, 16, 10, 36, 36, 13, 13, 13, 13, 22]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
-    # Dados
+    ROW_H = 80
+    tmpfiles = []
     alt_fill = PatternFill("solid", fgColor="F5F5F5")
+
     for idx, p in enumerate(concluidos, 1):
         row = idx + 3
-        ws.row_dimensions[row].height = 22
+        ws.row_dimensions[row].height = ROW_H
         fill = alt_fill if idx % 2 == 0 else PatternFill("solid", fgColor="FFFFFF")
+
         valores = [
             idx,
-            p.get("trecho",""),
-            p.get("rodovia",""),
-            p.get("inicio",""),
-            p.get("fim",""),
-            p.get("lat",""),
-            p.get("lng",""),
-            p.get("periodo_inicio") or "—",
-            p.get("periodo_fim")    or "—",
+            p.get("id", ""),
+            p.get("trecho", ""),
+            p.get("rodovia", ""),
+            p.get("inicio", ""),
+            p.get("fim", ""),
+            p.get("lat", ""),
+            p.get("lng", ""),
+            p.get("periodo_inicio") or "-",
+            p.get("periodo_fim")    or "-",
         ]
         for col, val in enumerate(valores, 1):
             cell = ws.cell(row=row, column=col, value=val)
             cell.fill = fill
             cell.border = border
-            cell.alignment = center if col in [1,2,3,6,7,8,9] else left
+            cell.alignment = center if col in [1,2,3,4,7,8,9,10] else left
             cell.font = Font(size=10)
 
-    # Totalizador
+        foto_cell = ws.cell(row=row, column=11)
+        foto_cell.fill = fill
+        foto_cell.border = border
+        foto_cell.alignment = center
+
+        try:
+            fotos = listar_fotos_drive(p["id"])
+            if fotos:
+                req = urllib.request.urlopen(fotos[0], timeout=15)
+                img_bytes = req.read()
+                tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                tmp.write(img_bytes)
+                tmp.close()
+                tmpfiles.append(tmp.name)
+                img = XLImage(tmp.name)
+                img.width  = 100
+                img.height = 75
+                ws.add_image(img, f"{get_column_letter(11)}{row}")
+            else:
+                foto_cell.value = "Sem foto"
+                foto_cell.font = Font(size=9, italic=True, color="999999")
+        except Exception as e:
+            print(f"Foto {p['id']}: {e}")
+            foto_cell.value = "Sem foto"
+            foto_cell.font = Font(size=9, italic=True, color="999999")
+
     tot_row = len(concluidos) + 4
-    ws.merge_cells(f"A{tot_row}:F{tot_row}")
-    ws[f"A{tot_row}"] = f"TOTAL DE PONTOS CONCLUÍDOS: {len(concluidos)}"
+    ws.merge_cells(f"A{tot_row}:{get_column_letter(NCOLS)}{tot_row}")
+    ws[f"A{tot_row}"] = f"TOTAL DE PONTOS CONCLUIDOS: {len(concluidos)}"
     ws[f"A{tot_row}"].font = green_font
     ws[f"A{tot_row}"].fill = green_fill
     ws[f"A{tot_row}"].alignment = center
 
-    # Salva em buffer
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+
+    for f in tmpfiles:
+        try: os.unlink(f)
+        except: pass
 
     nome = f"Resumo_Contagens_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
     return StreamingResponse(
