@@ -449,10 +449,11 @@ def download_resumo():
         cell.alignment = center
         cell.border = border
 
-    # Larguras das colunas
+    # Larguras das colunas (usando letra direta para evitar MergedCell)
+    from openpyxl.utils import get_column_letter
     widths = [5, 16, 10, 38, 38, 13, 13, 14, 14]
     for i, w in enumerate(widths, 1):
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+        ws.column_dimensions[get_column_letter(i)].width = w
 
     # Dados
     alt_fill = PatternFill("solid", fgColor="F5F5F5")
