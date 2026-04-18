@@ -4,6 +4,7 @@ Fotos servidas via Google Drive API (pastas públicas)
 """
 
 import os, json, urllib.request, urllib.parse, zipfile, io, tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 BRASILIA = timezone(timedelta(hours=-3))
@@ -323,24 +324,22 @@ def limpar_cache():
 
 @app.get("/api/download/zip-xlsx")
 def download_zip_xlsx():
-    """Baixa ZIP com todos os .xlsx dos pontos concluídos"""
+    """Baixa ZIP com todos os xlsx dos pontos concluidos — download paralelo"""
     from fastapi.responses import StreamingResponse
+    import unicodedata
 
-    # Busca pontos concluídos
     pontos = ler_excel()
     concluidos = []
     for p in pontos:
-        k = (p.get("status","")).upper().normalize("NFD") if hasattr((p.get("status","")).upper(), "normalize") else p.get("status","").upper()
-        import unicodedata
         k = unicodedata.normalize("NFD", p.get("status","").upper())
         k = "".join(c for c in k if unicodedata.category(c) != "Mn")
         if "CONCLU" in k:
             concluidos.append(p)
 
     if not concluidos:
-        raise HTTPException(404, "Nenhum ponto concluído encontrado")
+        raise HTTPException(404, "Nenhum ponto concluido encontrado")
 
-    # Busca IDs das pastas no Drive
+    # Garante cache do root
     now = time.time()
     if "root_items" not in _cache_subpastas or (now - _cache_timestamp.get("root", 0)) > CACHE_TTL:
         items = drive_list(DRIVE_ROOT_FOLDER)
@@ -350,35 +349,38 @@ def download_zip_xlsx():
         }
         _cache_timestamp["root"] = now
 
-    # Monta ZIP em memória
-    zip_buffer = io.BytesIO()
-    encontrados = 0
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for p in concluidos:
-            pid = p["id"]
-            pasta_id = _cache_subpastas["root_items"].get(pid)
-            if not pasta_id:
-                continue
-            # Lista arquivos na pasta do ponto
-            arquivos = drive_list(pasta_id)
-            for arq in arquivos:
-                mime = arq.get("mimeType", "")
-                nome = arq.get("name", "")
-                if (mime in {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             "application/vnd.ms-excel"}
+    def baixar_ponto(p):
+        """Retorna (nome_arquivo, bytes) ou None"""
+        pid = p["id"]
+        pasta_id = _cache_subpastas["root_items"].get(pid)
+        if not pasta_id:
+            return None
+        arquivos = drive_list(pasta_id)
+        for arq in arquivos:
+            mime = arq.get("mimeType", "")
+            nome = arq.get("name", "")
+            if (mime in {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         "application/vnd.ms-excel"}
                     or nome.lower().endswith(".xlsx")):
-                    # Download do arquivo
-                    try:
-                        url = f"https://drive.google.com/uc?export=download&id={arq['id']}"
-                        req = urllib.request.urlopen(url, timeout=30)
-                        dados = req.read()
-                        zf.writestr(f"{pid}/{nome}", dados)
-                        encontrados += 1
-                    except Exception as e:
-                        print(f"Erro ao baixar {pid}/{nome}: {e}")
+                try:
+                    url = f"{DRIVE_BASE_URL}/files/{arq['id']}?alt=media&key={DRIVE_API_KEY}"
+                    req = urllib.request.urlopen(url, timeout=30)
+                    dados = req.read()
+                    return (f"{pid}/{nome}", dados)
+                except Exception as e:
+                    print(f"Erro {pid}: {e}")
+        return None
 
-    if encontrados == 0:
-        raise HTTPException(404, "Nenhum arquivo xlsx encontrado nos pontos concluídos")
+    # Download paralelo — até 8 pontos simultaneamente
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {executor.submit(baixar_ponto, p): p for p in concluidos}
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    nome_arq, dados = result
+                    zf.writestr(nome_arq, dados)
 
     zip_buffer.seek(0)
     from datetime import datetime as dt
