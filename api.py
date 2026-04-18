@@ -520,23 +520,27 @@ def download_resumo():
                 EXTS_FOTO_MIME = {"image/jpeg","image/png","image/webp","image/jpg"}
                 for fi in fotos_items:
                     if fi.get("mimeType","") in EXTS_FOTO_MIME:
-                        foto_url = f"https://drive.google.com/uc?export=download&id={fi['id']}&confirm=t"
+                        foto_url = fi["id"]  # guarda só o file_id
                         break
 
             if foto_url:
-                req_obj = urllib.request.Request(foto_url, headers={
-                    "User-Agent": "Mozilla/5.0"
-                })
+                # Download autenticado via Drive API
+                api_dl_url = f"{DRIVE_BASE_URL}/files/{foto_url}?alt=media&key={DRIVE_API_KEY}"
+                req_obj = urllib.request.Request(api_dl_url, headers={"User-Agent": "Mozilla/5.0"})
                 req = urllib.request.urlopen(req_obj, timeout=20)
                 img_bytes = req.read()
-                tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                tmp.write(img_bytes)
-                tmp.close()
-                tmpfiles.append(tmp.name)
-                img = XLImage(tmp.name)
-                img.width  = 100
-                img.height = 75
-                ws.add_image(img, f"{get_column_letter(11)}{row}")
+                if len(img_bytes) > 1000:  # valida que é uma imagem real
+                    tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                    tmp.write(img_bytes)
+                    tmp.close()
+                    tmpfiles.append(tmp.name)
+                    img = XLImage(tmp.name)
+                    img.width  = 100
+                    img.height = 75
+                    ws.add_image(img, f"{get_column_letter(11)}{row}")
+                else:
+                    foto_cell.value = "Sem foto"
+                    foto_cell.font = Font(size=9, italic=True, color="999999")
             else:
                 foto_cell.value = "Sem foto"
                 foto_cell.font = Font(size=9, italic=True, color="999999")
