@@ -438,12 +438,9 @@ def download_resumo():
     ws["A2"].alignment = center
     ws.row_dimensions[2].height = 18
 
-    # Cabeçalhos
-    headers = ["Nº", "Código
-Ponto", "Rodovia", "Descrição Início", "Descrição Fim",
-               "Latitude", "Longitude", "Período
-Início", "Período
-Fim"]
+    # Cabecalhos
+    headers = ["N", "Codigo Ponto", "Rodovia", "Descricao Inicio", "Descricao Fim",
+               "Latitude", "Longitude", "Periodo Inicio", "Periodo Fim"]
     ws.row_dimensions[3].height = 36
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col, value=h)
