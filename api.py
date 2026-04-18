@@ -489,9 +489,42 @@ def download_resumo():
         foto_cell.alignment = center
 
         try:
-            fotos = listar_fotos_drive(p["id"])
-            if fotos:
-                req = urllib.request.urlopen(fotos[0], timeout=15)
+            # Busca fotos diretamente sem cache
+            pid = p["id"]
+            pasta_ponto_id = _cache_subpastas.get("root_items", {}).get(pid)
+            if not pasta_ponto_id:
+                # Recarrega root_items
+                items_root = drive_list(DRIVE_ROOT_FOLDER)
+                root_map = {i["name"]: i["id"] for i in items_root
+                            if i["mimeType"] == "application/vnd.google-apps.folder"}
+                _cache_subpastas["root_items"] = root_map
+                _cache_timestamp["root"] = time.time()
+                pasta_ponto_id = root_map.get(pid)
+
+            foto_url = None
+            if pasta_ponto_id:
+                # Busca subpasta FOTOS - INSTALACAO
+                sub_id = encontrar_subpasta(Path("/tmp") / pid)  # fallback
+                # Usa drive direto
+                items_ponto = drive_list(pasta_ponto_id)
+                # Procura subpasta com "instal" no nome
+                sub_pasta_id = None
+                for item in items_ponto:
+                    if item["mimeType"] == "application/vnd.google-apps.folder":
+                        if "instal" in item["name"].lower():
+                            sub_pasta_id = item["id"]
+                            break
+                # Se nao achou subpasta, tenta fotos direto na pasta do ponto
+                buscar_em = sub_pasta_id or pasta_ponto_id
+                fotos_items = drive_list(buscar_em)
+                EXTS_FOTO_MIME = {"image/jpeg","image/png","image/webp","image/jpg"}
+                for fi in fotos_items:
+                    if fi.get("mimeType","") in EXTS_FOTO_MIME:
+                        foto_url = f"https://lh3.googleusercontent.com/d/{fi['id']}"
+                        break
+
+            if foto_url:
+                req = urllib.request.urlopen(foto_url, timeout=20)
                 img_bytes = req.read()
                 tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
                 tmp.write(img_bytes)
