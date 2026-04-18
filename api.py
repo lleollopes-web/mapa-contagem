@@ -392,12 +392,11 @@ def download_zip_xlsx():
 
 @app.get("/api/download/resumo-xlsx")
 def download_resumo():
-    """Gera planilha resumo dos pontos concluidos com ID e foto"""
+    """Gera planilha resumo dos pontos concluidos"""
     from fastapi.responses import StreamingResponse
     from openpyxl.utils import get_column_letter
-    from openpyxl.drawing.image import Image as XLImage
     from datetime import datetime as dt
-    import unicodedata, tempfile, os
+    import unicodedata
 
     pontos = ler_excel()
     concluidos = []
@@ -423,7 +422,7 @@ def download_resumo():
     green_fill  = PatternFill("solid", fgColor="E8F5E9")
     green_font  = Font(bold=True, color="1B5E20", size=11)
 
-    NCOLS = 11
+    NCOLS = 10
 
     ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1")
     ws["A1"] = "RELATORIO DE PONTOS DE CONTAGEM CONCLUIDOS"
@@ -442,7 +441,7 @@ def download_resumo():
     headers = ["N", "ID Ponto", "Codigo Trecho", "Rodovia",
                "Descricao Inicio", "Descricao Fim",
                "Latitude", "Longitude",
-               "Periodo Inicio", "Periodo Fim", "Foto"]
+               "Periodo Inicio", "Periodo Fim"]
     ws.row_dimensions[3].height = 36
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col, value=h)
@@ -451,19 +450,15 @@ def download_resumo():
         cell.alignment = center
         cell.border = border
 
-    widths = [5, 10, 16, 10, 36, 36, 13, 13, 13, 13, 22]
+    widths = [5, 10, 16, 10, 36, 36, 13, 13, 13, 13]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
-    ROW_H = 80
-    tmpfiles = []
     alt_fill = PatternFill("solid", fgColor="F5F5F5")
-
     for idx, p in enumerate(concluidos, 1):
         row = idx + 3
-        ws.row_dimensions[row].height = ROW_H
+        ws.row_dimensions[row].height = 22
         fill = alt_fill if idx % 2 == 0 else PatternFill("solid", fgColor="FFFFFF")
-
         valores = [
             idx,
             p.get("id", ""),
@@ -483,72 +478,6 @@ def download_resumo():
             cell.alignment = center if col in [1,2,3,4,7,8,9,10] else left
             cell.font = Font(size=10)
 
-        foto_cell = ws.cell(row=row, column=11)
-        foto_cell.fill = fill
-        foto_cell.border = border
-        foto_cell.alignment = center
-
-        try:
-            # Busca fotos diretamente sem cache
-            pid = p["id"]
-            pasta_ponto_id = _cache_subpastas.get("root_items", {}).get(pid)
-            if not pasta_ponto_id:
-                # Recarrega root_items
-                items_root = drive_list(DRIVE_ROOT_FOLDER)
-                root_map = {i["name"]: i["id"] for i in items_root
-                            if i["mimeType"] == "application/vnd.google-apps.folder"}
-                _cache_subpastas["root_items"] = root_map
-                _cache_timestamp["root"] = time.time()
-                pasta_ponto_id = root_map.get(pid)
-
-            foto_url = None
-            if pasta_ponto_id:
-                # Busca subpasta FOTOS - INSTALACAO
-                sub_id = encontrar_subpasta(Path("/tmp") / pid)  # fallback
-                # Usa drive direto
-                items_ponto = drive_list(pasta_ponto_id)
-                # Procura subpasta com "instal" no nome
-                sub_pasta_id = None
-                for item in items_ponto:
-                    if item["mimeType"] == "application/vnd.google-apps.folder":
-                        if "instal" in item["name"].lower():
-                            sub_pasta_id = item["id"]
-                            break
-                # Se nao achou subpasta, tenta fotos direto na pasta do ponto
-                buscar_em = sub_pasta_id or pasta_ponto_id
-                fotos_items = drive_list(buscar_em)
-                EXTS_FOTO_MIME = {"image/jpeg","image/png","image/webp","image/jpg"}
-                for fi in fotos_items:
-                    if fi.get("mimeType","") in EXTS_FOTO_MIME:
-                        foto_url = fi["id"]  # guarda só o file_id
-                        break
-
-            if foto_url:
-                # Download autenticado via Drive API
-                api_dl_url = f"{DRIVE_BASE_URL}/files/{foto_url}?alt=media&key={DRIVE_API_KEY}"
-                req_obj = urllib.request.Request(api_dl_url, headers={"User-Agent": "Mozilla/5.0"})
-                req = urllib.request.urlopen(req_obj, timeout=20)
-                img_bytes = req.read()
-                if len(img_bytes) > 1000:  # valida que é uma imagem real
-                    tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                    tmp.write(img_bytes)
-                    tmp.close()
-                    tmpfiles.append(tmp.name)
-                    img = XLImage(tmp.name)
-                    img.width  = 100
-                    img.height = 75
-                    ws.add_image(img, f"{get_column_letter(11)}{row}")
-                else:
-                    foto_cell.value = "Sem foto"
-                    foto_cell.font = Font(size=9, italic=True, color="999999")
-            else:
-                foto_cell.value = "Sem foto"
-                foto_cell.font = Font(size=9, italic=True, color="999999")
-        except Exception as e:
-            print(f"Foto {p['id']}: {e}")
-            foto_cell.value = "Sem foto"
-            foto_cell.font = Font(size=9, italic=True, color="999999")
-
     tot_row = len(concluidos) + 4
     ws.merge_cells(f"A{tot_row}:{get_column_letter(NCOLS)}{tot_row}")
     ws[f"A{tot_row}"] = f"TOTAL DE PONTOS CONCLUIDOS: {len(concluidos)}"
@@ -559,10 +488,6 @@ def download_resumo():
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-
-    for f in tmpfiles:
-        try: os.unlink(f)
-        except: pass
 
     nome = f"Resumo_Contagens_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
     return StreamingResponse(
