@@ -183,7 +183,7 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-table .col-val  { text-align:right; }
 .fin-table .col-tot  { text-align:right; font-weight:700; color:#880e4f; }
 .fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; }
-.fin-row-qtd  td { background:#f8bbd9; font-weight:700; }
+.fin-row-qtd  td { background:#f8bbd9; font-weight:700; text-align:center; }
 .fin-row-cpp  td { background:#f8bbd9; font-weight:700; }
 .fin-resumo { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
 .fin-card { background:linear-gradient(135deg,#880e4f,#c2185b); color:#fff;
@@ -739,9 +739,9 @@ function abrirFinanceiro() {
       // QTD PONTOS
       html += '<tr class="fin-row-qtd"><td>QTD DE PONTOS</td>';
       d.qtd_pontos.forEach(function(v){
-        html += '<td style="text-align:center">' + v + '</td>';
+        html += '<td style="text-align:center;font-weight:700;font-size:14px">' + v + '</td>';
       });
-      html += '<td style="text-align:center">' + d.total_pontos + '</td></tr>';
+      html += '<td style="text-align:center;font-weight:700;font-size:14px">' + d.total_pontos + '</td></tr>';
 
       // CUSTO POR PONTO por viagem
       html += '<tr class="fin-row-cpp"><td>CUSTO POR PONTO</td>';
