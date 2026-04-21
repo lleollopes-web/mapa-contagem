@@ -527,7 +527,9 @@ def get_financeiro():
         vals = []
         for col_idx in [2, 4, 6]:
             v = row.iloc[col_idx]
-            try:    vals.append(float(str(v).replace(",",".")))
+            try:
+                fv = float(str(v).replace(",",".").strip())
+                vals.append(0.0 if (fv != fv) else fv)  # NaN check
             except: vals.append(0.0)
         itens.append({"tipo": tipo, "valores": vals, "total": sum(vals)})
 
@@ -536,7 +538,9 @@ def get_financeiro():
     totais_viagem = []
     for col_idx in [2, 4, 6]:
         v = row_tot.iloc[col_idx]
-        try:    totais_viagem.append(float(str(v).replace(",",".")))
+        try:
+            fv = float(str(v).replace(",",".").strip())
+            totais_viagem.append(0.0 if (fv != fv) else fv)
         except: totais_viagem.append(0.0)
 
     # QTD pontos (linha 10, índice 9)
@@ -544,7 +548,9 @@ def get_financeiro():
     qtd_pontos = []
     for col_idx in [2, 4, 6]:
         v = row_qtd.iloc[col_idx]
-        try:    qtd_pontos.append(int(float(str(v).replace(",","."))))
+        try:
+            fv = float(str(v).replace(",",".").strip())
+            qtd_pontos.append(0 if (fv != fv) else int(fv))
         except: qtd_pontos.append(0)
 
     total_geral = sum(totais_viagem)
