@@ -184,6 +184,7 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-table .col-tot  { text-align:right; font-weight:700; color:#880e4f; }
 .fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; }
 .fin-row-qtd  td { background:#f8bbd9; font-weight:700; text-align:center; }
+.fin-row-qtd  td:first-child { text-align:left; }
 .fin-row-cpp  td { background:#f8bbd9; font-weight:700; }
 .fin-resumo { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
 .fin-card { background:linear-gradient(135deg,#880e4f,#c2185b); color:#fff;
@@ -734,7 +735,7 @@ function abrirFinanceiro() {
       d.totais_viagem.forEach(function(v){
         html += '<td class="col-val">' + fmt(v) + '</td>';
       });
-      html += '<td class="col-tot">' + fmt(d.total_geral) + '</td></tr>';
+      html += '<td class="col-tot" style="color:#fff;font-weight:800;font-size:13px">' + fmt(d.total_geral) + '</td></tr>';
 
       // QTD PONTOS
       html += '<tr class="fin-row-qtd"><td>QTD DE PONTOS</td>';
