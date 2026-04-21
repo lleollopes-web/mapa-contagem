@@ -553,18 +553,32 @@ def get_financeiro():
             qtd_pontos.append(0 if (fv != fv) else int(fv))
         except: qtd_pontos.append(0)
 
-    total_geral = sum(totais_viagem)
+    # Calcula totais por viagem somando os itens (ignora fórmulas do Excel)
+    totais_viagem_calc = [0.0, 0.0, 0.0]
+    for item in itens:
+        for j, v in enumerate(item["valores"]):
+            totais_viagem_calc[j] += v
+
+    # Custo por ponto por viagem
+    custo_por_ponto_viagem = []
+    for j in range(3):
+        cpp = round(totais_viagem_calc[j] / qtd_pontos[j], 2) if qtd_pontos[j] > 0 else 0.0
+        custo_por_ponto_viagem.append(cpp)
+
+    # Totais gerais
+    total_geral  = round(sum(totais_viagem_calc), 2)
     total_pontos = sum(qtd_pontos)
-    custo_por_ponto = round(total_geral / total_pontos, 2) if total_pontos > 0 else 0
+    custo_por_ponto = round(total_geral / total_pontos, 2) if total_pontos > 0 else 0.0
 
     return JSONResponse({
-        "viagens":         viagens,
-        "itens":           itens,
-        "totais_viagem":   totais_viagem,
-        "qtd_pontos":      qtd_pontos,
-        "total_geral":     round(total_geral, 2),
-        "total_pontos":    total_pontos,
-        "custo_por_ponto": custo_por_ponto,
+        "viagens":               viagens,
+        "itens":                 itens,
+        "totais_viagem":         [round(v, 2) for v in totais_viagem_calc],
+        "qtd_pontos":            qtd_pontos,
+        "custo_por_ponto_viagem": custo_por_ponto_viagem,
+        "total_geral":           total_geral,
+        "total_pontos":          total_pontos,
+        "custo_por_ponto":       custo_por_ponto,
     })
 
 

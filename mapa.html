@@ -745,9 +745,8 @@ function abrirFinanceiro() {
 
       // CUSTO POR PONTO por viagem
       html += '<tr class="fin-row-cpp"><td>CUSTO POR PONTO</td>';
-      d.totais_viagem.forEach(function(v, i){
-        var cpp = d.qtd_pontos[i] > 0 ? v / d.qtd_pontos[i] : 0;
-        html += '<td class="col-val">' + fmt(cpp) + '</td>';
+      d.custo_por_ponto_viagem.forEach(function(v){
+        html += '<td class="col-val">' + fmt(v) + '</td>';
       });
       html += '<td class="col-tot">' + fmt(d.custo_por_ponto) + '</td></tr>';
 
