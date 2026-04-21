@@ -191,6 +191,16 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-card .label { font-size:11px; opacity:0.85; margin-bottom:6px; }
 .fin-card .valor { font-size:20px; font-weight:800; }
 .fin-loading { text-align:center; padding:40px; color:#aaa; font-size:14px; }
+
+/* ── Botão Sair ── */
+#btn-sair {
+  position:absolute; bottom:20px; right:20px; z-index:1000;
+  background:rgba(255,255,255,0.92); border:1.5px solid #e0e0e0;
+  color:#555; padding:7px 16px; border-radius:20px; font-size:12px;
+  font-weight:600; cursor:pointer; display:flex; align-items:center;
+  gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:all 0.2s;
+}
+#btn-sair:hover { background:#ffebee; border-color:#ef9a9a; color:#c62828; }
 </style>
 </head>
 <body>
@@ -280,6 +290,10 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   <button id="lb-next" onclick="lbNav(1);event.stopPropagation()">&#8250;</button>
   <div id="lb-caption"></div>
 </div>
+<button id="btn-sair" onclick="sairSessao()" title="Encerrar sessão">
+  &#128274; Sair
+</button>
+
 <footer id="footer-info">Mapa de Contagem de Tr&#225;fego &mdash; COMOL Consultoria M.L.</footer>
 
 <script>
@@ -594,10 +608,17 @@ var perfilAtual = '';
 function fazerLogin() {
   var u = document.getElementById('login-user').value.trim().toLowerCase();
   var p = document.getElementById('login-pass').value;
-  var ok = USUARIOS.some(function(c){ return c.user===u && c.pass===p; });
-  if (ok) {
-    document.getElementById('login-overlay').style.display = 'none';
+  var usuario = USUARIOS.find(function(c){ return c.user===u && c.pass===p; });
+  if (usuario) {
+    perfilAtual = usuario.perfil;
     sessionStorage.setItem('autenticado', '1');
+    sessionStorage.setItem('perfil', usuario.perfil);
+    document.getElementById('login-overlay').style.display = 'none';
+    if (usuario.perfil === 'diretoria') {
+      document.getElementById('btn-financeiro').style.display = 'inline-flex';
+    } else {
+      document.getElementById('btn-financeiro').style.display = 'none';
+    }
   } else {
     document.getElementById('login-erro').style.display = 'block';
     document.getElementById('login-pass').value = '';
@@ -749,6 +770,24 @@ function abrirFinanceiro() {
 
 function fecharFinanceiro() {
   document.getElementById('painel-fin').style.display = 'none';
+}
+
+
+function sairSessao() {
+  sessionStorage.removeItem('autenticado');
+  sessionStorage.removeItem('perfil');
+  perfilAtual = '';
+  // Esconde botão financeiro
+  var btnFin = document.getElementById('btn-financeiro');
+  if (btnFin) btnFin.style.display = 'none';
+  // Fecha painéis abertos
+  fecharFinanceiro();
+  closePanel();
+  // Limpa campos e mostra tela de login
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-erro').style.display = 'none';
+  document.getElementById('login-overlay').style.display = 'flex';
 }
 
 </script>
