@@ -159,6 +159,38 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .dl-btn-zip:hover  { background:#2e7d32; }
 .dl-btn-xlsx:hover { background:#1976d2; }
 .dl-btn.loading { opacity:0.6; pointer-events:none; }
+
+/* ── Painel Financeiro ── */
+.dl-btn-fin { background: linear-gradient(90deg,#880e4f,#c2185b); color:#fff; }
+.dl-btn-fin:hover { background: #ad1457; }
+#painel-fin {
+  position:absolute; top:110px; left:15px; width:780px; max-width:calc(100vw - 30px);
+  background:#fff; border:1px solid #e0e0e0; border-radius:14px; z-index:1000;
+  display:none; box-shadow:0 8px 32px rgba(0,0,0,0.18);
+  max-height:calc(100vh - 130px); overflow-y:auto;
+}
+.fin-header { background:linear-gradient(90deg,#880e4f,#c2185b); color:#fff;
+  padding:14px 20px; border-radius:14px 14px 0 0; display:flex;
+  justify-content:space-between; align-items:center; position:sticky; top:0; z-index:1; }
+.fin-header h3 { font-size:15px; font-weight:700; margin:0; }
+.fin-close { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
+.fin-body { padding:18px 20px; }
+.fin-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px; }
+.fin-table th { background:#c2185b; color:#fff; padding:8px 10px; text-align:center; font-weight:700; }
+.fin-table td { padding:7px 10px; border-bottom:1px solid #f0e0e8; }
+.fin-table tr:nth-child(even) td { background:#fdf0f5; }
+.fin-table .col-tipo { text-align:left; font-weight:500; }
+.fin-table .col-val  { text-align:right; }
+.fin-table .col-tot  { text-align:right; font-weight:700; color:#880e4f; }
+.fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; }
+.fin-row-qtd  td { background:#f8bbd9; font-weight:700; }
+.fin-row-cpp  td { background:#f8bbd9; font-weight:700; }
+.fin-resumo { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+.fin-card { background:linear-gradient(135deg,#880e4f,#c2185b); color:#fff;
+  border-radius:12px; padding:16px; text-align:center; }
+.fin-card .label { font-size:11px; opacity:0.85; margin-bottom:6px; }
+.fin-card .valor { font-size:20px; font-weight:800; }
+.fin-loading { text-align:center; padding:40px; color:#aaa; font-size:14px; }
 </style>
 </head>
 <body>
@@ -196,6 +228,11 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     <div class="st-item"><div class="st-dot" style="background:#78909c"></div>Sem info</div>
   </div>
   <div id="download-bar">
+    <button class="dl-btn dl-btn-fin" id="btn-financeiro"
+            onclick="abrirFinanceiro()" style="display:none"
+            title="Painel financeiro — acesso restrito">
+      &#128200; Financeiro
+    </button>
     <button class="dl-btn dl-btn-xlsx" onclick="downloadResumo(this)" title="Planilha resumo dos pontos concluídos">
       &#128202; Resumo Concluídos
     </button>
@@ -226,6 +263,16 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     <div class="tab-content"        id="tab-fotos"></div>
   </div>
 </div>
+<div id="painel-fin">
+  <div class="fin-header">
+    <h3>&#128200; Controle de Gastos — COMOL</h3>
+    <button class="fin-close" onclick="fecharFinanceiro()">&#10005;</button>
+  </div>
+  <div class="fin-body" id="fin-body">
+    <div class="fin-loading">Carregando dados financeiros...</div>
+  </div>
+</div>
+
 <div id="lightbox" onclick="lbBgClick(event)">
   <button id="lb-close" onclick="closeLb()">&#10005;</button>
   <button id="lb-prev" onclick="lbNav(-1);event.stopPropagation()">&#8249;</button>
@@ -539,8 +586,10 @@ carregarPontos();
 // ── Credenciais de acesso ──
 // Para adicionar usuários: { user: 'nome', pass: 'senha' }
 var USUARIOS = [
-  { user: 'comol', pass: '0101' },
+  { user: 'comol',     pass: '0101',     perfil: 'normal'    },
+  { user: 'diretoria', pass: 'inicial1.', perfil: 'diretoria' },
 ];
+var perfilAtual = '';
 
 function fazerLogin() {
   var u = document.getElementById('login-user').value.trim().toLowerCase();
@@ -566,6 +615,10 @@ document.addEventListener('keydown', function(e) {
 // Mantém sessão durante a visita (fecha e reabre a aba exige login novamente)
 if (sessionStorage.getItem('autenticado') === '1') {
   document.getElementById('login-overlay').style.display = 'none';
+  perfilAtual = sessionStorage.getItem('perfil') || 'normal';
+  if (perfilAtual === 'diretoria') {
+    document.getElementById('btn-financeiro').style.display = 'inline-flex';
+  }
 }
 
 
@@ -625,6 +678,77 @@ function downloadZip(btn) {
       btn.classList.remove('loading');
       btn.innerHTML = '&#128229; Download Planilhas 15min';
     });
+}
+
+
+/* ── Painel Financeiro ── */
+function fmt(v) {
+  return 'R$ ' + parseFloat(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function abrirFinanceiro() {
+  document.getElementById('painel-fin').style.display = 'block';
+  document.getElementById('fin-body').innerHTML =
+    '<div class="fin-loading">&#9203; Carregando dados...</div>';
+
+  fetch(API_BASE + '/api/financeiro')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var viagens = d.viagens;
+      var html = '<table class="fin-table"><thead><tr>';
+      html += '<th>TIPO DE GASTOS</th>';
+      viagens.forEach(function(v){ html += '<th>' + v + '</th>'; });
+      html += '<th>TOTAL</th></tr></thead><tbody>';
+
+      d.itens.forEach(function(item){
+        html += '<tr><td class="col-tipo">' + item.tipo + '</td>';
+        item.valores.forEach(function(v){
+          html += '<td class="col-val">' + (v > 0 ? fmt(v) : 'R$ —') + '</td>';
+        });
+        html += '<td class="col-tot">' + fmt(item.total) + '</td></tr>';
+      });
+
+      // Linha TOTAL
+      html += '<tr class="fin-row-total"><td>TOTAL</td>';
+      d.totais_viagem.forEach(function(v){
+        html += '<td class="col-val">' + fmt(v) + '</td>';
+      });
+      html += '<td class="col-tot">' + fmt(d.total_geral) + '</td></tr>';
+
+      // QTD PONTOS
+      html += '<tr class="fin-row-qtd"><td>QTD DE PONTOS</td>';
+      d.qtd_pontos.forEach(function(v){
+        html += '<td style="text-align:center">' + v + '</td>';
+      });
+      html += '<td style="text-align:center">' + d.total_pontos + '</td></tr>';
+
+      // CUSTO POR PONTO por viagem
+      html += '<tr class="fin-row-cpp"><td>CUSTO POR PONTO</td>';
+      d.totais_viagem.forEach(function(v, i){
+        var cpp = d.qtd_pontos[i] > 0 ? v / d.qtd_pontos[i] : 0;
+        html += '<td class="col-val">' + fmt(cpp) + '</td>';
+      });
+      html += '<td class="col-tot">' + fmt(d.custo_por_ponto) + '</td></tr>';
+
+      html += '</tbody></table>';
+
+      // Cards resumo
+      html += '<div class="fin-resumo">';
+      html += '<div class="fin-card"><div class="label">TOTAL GERAL</div><div class="valor">' + fmt(d.total_geral) + '</div></div>';
+      html += '<div class="fin-card"><div class="label">TOTAL DE PONTOS CONCLUÍDOS</div><div class="valor">' + d.total_pontos + '</div></div>';
+      html += '<div class="fin-card"><div class="label">CUSTO POR PONTO CONCLUÍDO</div><div class="valor">' + fmt(d.custo_por_ponto) + '</div></div>';
+      html += '</div>';
+
+      document.getElementById('fin-body').innerHTML = html;
+    })
+    .catch(function(e){
+      document.getElementById('fin-body').innerHTML =
+        '<div class="fin-loading">Erro ao carregar dados: ' + e.message + '</div>';
+    });
+}
+
+function fecharFinanceiro() {
+  document.getElementById('painel-fin').style.display = 'none';
 }
 
 </script>

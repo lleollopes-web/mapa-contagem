@@ -25,7 +25,8 @@ except ImportError:
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 BASE_DIR  = Path(__file__).parent
-HTML_PATH = BASE_DIR / "mapa.html"
+HTML_PATH       = BASE_DIR / "mapa.html"
+FINANCEIRO_PATH = BASE_DIR / "financeiro.xlsx"
 
 def encontrar_excel():
     candidatos = [
@@ -497,6 +498,68 @@ def download_resumo():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={nome}"}
     )
+
+
+@app.get("/api/financeiro")
+def get_financeiro():
+    """Retorna dados financeiros para o painel da diretoria"""
+    if not FINANCEIRO_PATH.exists():
+        raise HTTPException(404, "Arquivo financeiro nao encontrado")
+
+    df_all = pd.read_excel(FINANCEIRO_PATH, sheet_name="Controle de Gastos",
+                           header=None, dtype=str)
+
+    tipos   = ["COMBUSTIVEL","ALIMENTACAO VIAGEM","AGUA","OUTROS","HOSPEDAGEM","SERVICOS DE TERCEIROS"]
+    viagens = []
+
+    # Lê cabeçalhos de viagem (linha 2, colunas C, E, G = índices 2,4,6)
+    header_row = df_all.iloc[1]
+    for col_idx in [2, 4, 6]:
+        nome = str(header_row.iloc[col_idx]).strip() if pd.notna(header_row.iloc[col_idx]) else f"VIAGEM {len(viagens)+1}"
+        if nome == "nan": nome = f"VIAGEM {len(viagens)+1}"
+        viagens.append(nome)
+
+    # Lê dados (linhas 3 a 8, índices 2 a 7)
+    itens = []
+    for row_i in range(2, 8):
+        row = df_all.iloc[row_i]
+        tipo = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else tipos[row_i-2]
+        vals = []
+        for col_idx in [2, 4, 6]:
+            v = row.iloc[col_idx]
+            try:    vals.append(float(str(v).replace(",",".")))
+            except: vals.append(0.0)
+        itens.append({"tipo": tipo, "valores": vals, "total": sum(vals)})
+
+    # Totais por viagem (linha 9, índice 8)
+    row_tot = df_all.iloc[8]
+    totais_viagem = []
+    for col_idx in [2, 4, 6]:
+        v = row_tot.iloc[col_idx]
+        try:    totais_viagem.append(float(str(v).replace(",",".")))
+        except: totais_viagem.append(0.0)
+
+    # QTD pontos (linha 10, índice 9)
+    row_qtd = df_all.iloc[9]
+    qtd_pontos = []
+    for col_idx in [2, 4, 6]:
+        v = row_qtd.iloc[col_idx]
+        try:    qtd_pontos.append(int(float(str(v).replace(",","."))))
+        except: qtd_pontos.append(0)
+
+    total_geral = sum(totais_viagem)
+    total_pontos = sum(qtd_pontos)
+    custo_por_ponto = round(total_geral / total_pontos, 2) if total_pontos > 0 else 0
+
+    return JSONResponse({
+        "viagens":         viagens,
+        "itens":           itens,
+        "totais_viagem":   totais_viagem,
+        "qtd_pontos":      qtd_pontos,
+        "total_geral":     round(total_geral, 2),
+        "total_pontos":    total_pontos,
+        "custo_por_ponto": custo_por_ponto,
+    })
 
 
 @app.get("/api/status")
