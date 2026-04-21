@@ -202,6 +202,41 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:all 0.2s;
 }
 #btn-sair:hover { background:#ffebee; border-color:#ef9a9a; color:#c62828; }
+
+/* ── Mobile responsivo ── */
+@media (max-width: 768px) {
+  /* Botões menores no mobile */
+  .dl-btn { font-size:10px; padding:4px 8px; gap:4px; }
+  #download-bar { gap:5px; }
+
+  /* Tabela financeira menor no mobile */
+  .fin-table { font-size:10px; }
+  .fin-table th { padding:5px 4px; font-size:10px; }
+  .fin-table td { padding:4px 4px; }
+  #painel-fin { width:calc(100vw - 20px); left:10px; right:10px; top:100px; }
+  .fin-header h3 { font-size:12px; }
+  .fin-body { padding:10px 10px; }
+  .fin-resumo { grid-template-columns:1fr; gap:8px; }
+  .fin-card .valor { font-size:16px; }
+  .fin-card .label { font-size:10px; }
+
+  /* Barra de controles */
+  #controls { padding:6px 10px; gap:6px; }
+  #search-box { width:140px; font-size:12px; }
+
+  /* Botão sair menor */
+  #btn-sair { font-size:11px; padding:5px 12px; bottom:14px; right:10px; }
+
+  /* Header menor */
+  header h1 { font-size:13px; }
+  header span { font-size:10px; }
+}
+
+@media (max-width: 480px) {
+  .dl-btn { font-size:9px; padding:3px 7px; }
+  .fin-table { font-size:9px; }
+  #search-box { width:110px; }
+}
 </style>
 </head>
 <body>
