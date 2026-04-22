@@ -176,16 +176,17 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-close { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
 .fin-body { padding:18px 20px; }
 .fin-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px; }
-.fin-table th { background:#c2185b; color:#fff; padding:8px 10px; text-align:center; font-weight:700; }
+.fin-table th { background:#c2185b; color:#fff; padding:8px 10px; text-align:center; font-weight:700; vertical-align:middle; }
 .fin-table td { padding:7px 10px; border-bottom:1px solid #f0e0e8; }
 .fin-table tr:nth-child(even) td { background:#fdf0f5; }
 .fin-table .col-tipo { text-align:left; font-weight:500; }
-.fin-table .col-val  { text-align:right; }
-.fin-table .col-tot  { text-align:right; font-weight:700; color:#880e4f; }
-.fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; }
-.fin-row-qtd  td { background:#f8bbd9; font-weight:700; text-align:center; }
+.fin-table .col-val  { text-align:center; }
+.fin-table .col-tot  { text-align:center; font-weight:700; color:#880e4f; }
+.fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; text-align:center; vertical-align:middle; }
+.fin-row-qtd  td { background:#f8bbd9; font-weight:700; text-align:center; vertical-align:middle; }
 .fin-row-qtd  td:first-child { text-align:left; }
-.fin-row-cpp  td { background:#f8bbd9; font-weight:700; }
+.fin-row-cpp  td { background:#f8bbd9; font-weight:700; text-align:center; vertical-align:middle; }
+.fin-row-cpp  td:first-child { text-align:left; }
 .fin-resumo { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
 .fin-card { background:linear-gradient(135deg,#880e4f,#c2185b); color:#fff;
   border-radius:12px; padding:16px; text-align:center; }
