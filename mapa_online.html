@@ -238,6 +238,17 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   .fin-table { font-size:9px; }
   #search-box { width:110px; }
 }
+
+/* ── Seção mensal ── */
+.fin-mes-section { margin-top:16px; border-top:2px solid #f8bbd9; padding-top:14px; }
+.fin-mes-titulo { font-size:12px; font-weight:700; color:#880e4f; text-transform:uppercase;
+  letter-spacing:0.8px; margin-bottom:10px; }
+.fin-mes-grid { display:flex; flex-wrap:wrap; gap:8px; }
+.fin-mes-card { background:linear-gradient(135deg,#f8bbd9,#f48fb1);
+  border-radius:10px; padding:10px 16px; text-align:center; min-width:110px; flex:1; }
+.fin-mes-card .mes-label { font-size:11px; font-weight:700; color:#880e4f; margin-bottom:4px; }
+.fin-mes-card .mes-qtd { font-size:22px; font-weight:800; color:#880e4f; }
+.fin-mes-card .mes-sub { font-size:10px; color:#ad1457; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -795,6 +806,21 @@ function abrirFinanceiro() {
       html += '<div class="fin-card"><div class="label">TOTAL DE PONTOS CONCLUÍDOS</div><div class="valor">' + d.total_pontos + '</div></div>';
       html += '<div class="fin-card"><div class="label">CUSTO POR PONTO CONCLUÍDO</div><div class="valor">' + fmt(d.custo_por_ponto) + '</div></div>';
       html += '</div>';
+
+      // Seção pontos por mês
+      if (d.pontos_por_mes && d.pontos_por_mes.length > 0) {
+        html += '<div class="fin-mes-section">';
+        html += '<div class="fin-mes-titulo">&#128197; Pontos Conclu&#237;dos por M&#234;s (data do per&#237;odo fim)</div>';
+        html += '<div class="fin-mes-grid">';
+        d.pontos_por_mes.forEach(function(m){
+          html += '<div class="fin-mes-card">' +
+            '<div class="mes-label">' + m.label + '</div>' +
+            '<div class="mes-qtd">' + m.qtd + '</div>' +
+            '<div class="mes-sub">ponto' + (m.qtd > 1 ? 's' : '') + ' conclu&#237;do' + (m.qtd > 1 ? 's' : '') + '</div>' +
+            '</div>';
+        });
+        html += '</div></div>';
+      }
 
       document.getElementById('fin-body').innerHTML = html;
     })

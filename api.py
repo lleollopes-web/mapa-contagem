@@ -570,6 +570,39 @@ def get_financeiro():
     total_pontos = sum(qtd_pontos)
     custo_por_ponto = round(total_geral / total_pontos, 2) if total_pontos > 0 else 0.0
 
+    # Pontos concluídos por mês (baseado no período fim da aba DADOS COLETADOS)
+    meses_pt = {1:"Janeiro",2:"Fevereiro",3:"Mar\u00e7o",4:"Abril",5:"Maio",6:"Junho",
+                7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}
+    pontos_por_mes = []
+    try:
+        from collections import defaultdict
+        df_dc = pd.read_excel(EXCEL_PATH, sheet_name="DADOS COLETADOS", header=None)
+        cont_mes = defaultdict(int)
+        for i in range(4, len(df_dc)):
+            row = df_dc.iloc[i]
+            # Tenta período fim (col 6), se inválida usa início (col 5)
+            data_encontrada = False
+            for col_idx in [6, 5]:
+                v = row.iloc[col_idx]
+                if pd.notna(v):
+                    try:
+                        ts = pd.Timestamp(v)
+                        if ts.year > 1950:
+                            cont_mes[(ts.year, ts.month)] += 1
+                            data_encontrada = True
+                            break
+                    except: pass
+            _ = data_encontrada  # evita warning
+        for (ano, mes), qtd in sorted(cont_mes.items()):
+            pontos_por_mes.append({
+                "mes":   meses_pt[mes],
+                "ano":   ano,
+                "label": f"{meses_pt[mes]}/{ano}",
+                "qtd":   qtd
+            })
+    except Exception as e:
+        print(f"Erro pontos por mes: {e}")
+
     return JSONResponse({
         "viagens":               viagens,
         "itens":                 itens,
@@ -579,6 +612,7 @@ def get_financeiro():
         "total_geral":           total_geral,
         "total_pontos":          total_pontos,
         "custo_por_ponto":       custo_por_ponto,
+        "pontos_por_mes":        pontos_por_mes,
     })
 
 
