@@ -512,6 +512,353 @@ def get_financeiro():
     tipos   = ["COMBUSTIVEL","ALIMENTACAO VIAGEM","AGUA","OUTROS","HOSPEDAGEM","SERVICOS DE TERCEIROS"]
     viagens = []
 
+    # Detecta viagens dinamicamente
+    header_row = df_all.iloc[1]
+    cols_viagem = []
+    col_idx = 2
+    while col_idx < len(df_all.columns):
+        h = header_row.iloc[col_idx] if col_idx < len(header_row) else None
+        if pd.notna(h) and str(h).strip() not in ('nan',''):
+            viagens.append(str(h).strip())
+            cols_viagem.append(col_idx)
+        col_idx += 2
+        if len(cols_viagem) > 0 and col_idx >= len(df_all.columns) - 2:
+            break
+
+    # Lê itens de gasto (linhas 3 a 8)
+    itens = []
+    for row_i in range(2, 8):
+        row = df_all.iloc[row_i]
+        tipo = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else tipos[row_i-2]
+        vals = []
+        for ci in cols_viagem:
+            v = row.iloc[ci] if ci < len(row) else None
+            try:
+                fv = float(str(v).replace(",",".").strip())
+                vals.append(0.0 if (fv != fv) else fv)
+            except: vals.append(0.0)
+        itens.append({"tipo": tipo, "valores": vals, "total": sum(vals)})
+
+    # QTD pontos (linha 10)
+    row_qtd = df_all.iloc[9]
+    qtd_pontos = []
+    for ci in cols_viagem:
+        v = row_qtd.iloc[ci] if ci < len(row_qtd) else None
+        try:
+            fv = float(str(v).replace(",",".").strip())
+            qtd_pontos.append(0 if (fv != fv) else int(fv))
+        except: qtd_pontos.append(0)
+
+    # Calcula totais por viagem
+    n_viagens = len(viagens)
+    totais_viagem_calc = [0.0] * n_viagens
+    for item in itens:
+        for j, v in enumerate(item["valores"]):
+            if j < n_viagens:
+                totais_viagem_calc[j] += v
+
+    # Custo por ponto por viagem
+    custo_por_ponto_viagem = []
+    for j in range(n_viagens):
+        qtd = qtd_pontos[j] if j < len(qtd_pontos) else 0
+        cpp = round(totais_viagem_calc[j] / qtd, 2) if qtd > 0 else 0.0
+        custo_por_ponto_viagem.append(cpp)
+
+    total_geral = round(sum(totais_viagem_calc), 2)
+
+    # Pontos concluídos por mês (baseado no período fim da aba DADOS COLETADOS)
+    meses_pt = {1:"Janeiro",2:"Fevereiro",3:"Mar\u00e7o",4:"Abril",5:"Maio",6:"Junho",
+                7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}
+    pontos_por_mes = []
+    try:
+        from collections import defaultdict
+        df_dc = pd.read_excel(EXCEL_PATH, sheet_name="DADOS COLETADOS", header=None)
+        cont_mes = defaultdict(int)
+        for i in range(4, len(df_dc)):
+            row = df_dc.iloc[i]
+            for col_d in [6, 5]:
+                v = row.iloc[col_d]
+                if pd.notna(v):
+                    try:
+                        ts = pd.Timestamp(v)
+                        if ts.year > 1950:
+                            cont_mes[(ts.year, ts.month)] += 1
+                            break
+                    except: pass
+        for (ano, mes), qtd in sorted(cont_mes.items()):
+            pontos_por_mes.append({
+                "mes":   meses_pt[mes],
+                "ano":   ano,
+                "label": f"{meses_pt[mes]}/{ano}",
+                "qtd":   qtd
+            })
+    except Exception as e:
+        print(f"Erro pontos por mes: {e}")
+
+    # Total de pontos = somatório dos meses (com data fim)
+    total_pontos_mes = sum(m["qtd"] for m in pontos_por_mes) if pontos_por_mes else 0
+    total_pontos = total_pontos_mes if total_pontos_mes > 0 else sum(qtd_pontos)
+    custo_por_ponto = round(total_geral / total_pontos, 2) if total_pontos > 0 else 0.0
+
+    return JSONResponse({
+        "viagens":                viagens,
+        "itens":                  itens,
+        "totais_viagem":          [round(v, 2) for v in totais_viagem_calc],
+        "qtd_pontos":             qtd_pontos,
+        "custo_por_ponto_viagem": custo_por_ponto_viagem,
+        "total_geral":            total_geral,
+        "total_pontos":           total_pontos,
+        "custo_por_ponto":        custo_por_ponto,
+        "pontos_por_mes":         pontos_por_mes,
+    })
+
+
+@app.get("/api/ponto/{pid}")
+def get_ponto(pid: str):
+    pontos = ler_excel()
+    for p in pontos:
+        if p["id"] == pid: return JSONResponse(p)
+    raise HTTPException(404, f"Ponto '{pid}' não encontrado")
+
+def encontrar_xlsx_drive(pid: str) -> Optional[str]:
+    """Encontra o arquivo .xlsx na pasta do ponto no Drive e retorna URL de download."""
+    now = time.time()
+    # Reutiliza cache de subpastas
+    if "root_items" not in _cache_subpastas or (now - _cache_timestamp.get("root", 0)) > CACHE_TTL:
+        items = drive_list(DRIVE_ROOT_FOLDER)
+        _cache_subpastas["root_items"] = {
+            i["name"]: i["id"] for i in items
+            if i["mimeType"] == "application/vnd.google-apps.folder"
+        }
+        _cache_timestamp["root"] = now
+    pasta_ponto_id = _cache_subpastas["root_items"].get(pid)
+    if not pasta_ponto_id:
+        return None
+    # Lista arquivos direto na pasta do ponto (não subpasta)
+    items = drive_list(pasta_ponto_id)
+    for item in items:
+        if (item.get("mimeType","") in
+            {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             "application/vnd.ms-excel"}
+            or item.get("name","").endswith(".xlsx")):
+            return f"https://drive.google.com/uc?export=download&id={item['id']}"
+    return None
+
+@app.get("/api/fotos/{pid}")
+def get_fotos(pid: str):
+    """Retorna fotos e link do xlsx de um ponto sob demanda"""
+    fotos = listar_fotos_drive(pid)
+    xlsx  = encontrar_xlsx_drive(pid)
+    return JSONResponse({"pid": pid, "fotos": fotos, "total": len(fotos), "xlsx": xlsx})
+
+@app.post("/api/upload-excel")
+async def upload_excel(file: UploadFile = File(...)):
+    if not file.filename.endswith((".xlsx",".xls")):
+        raise HTTPException(400, "Apenas .xlsx aceito")
+    EXCEL_PATH.write_bytes(await file.read())
+    # Limpa cache de fotos
+    _cache_fotos.clear()
+    _cache_subpastas.clear()
+    _cache_timestamp.clear()
+    return {"ok": True, "atualizado_em": datetime.now(BRASILIA).strftime("%d/%m/%Y %H:%M:%S")}
+
+@app.get("/api/limpar-cache")
+def limpar_cache():
+    """Força releitura das fotos do Drive"""
+    _cache_fotos.clear()
+    _cache_subpastas.clear()
+    _cache_timestamp.clear()
+    return {"ok": True, "msg": "Cache limpo"}
+
+@app.get("/api/download/zip-xlsx")
+def download_zip_xlsx():
+    """Baixa ZIP com todos os xlsx dos pontos concluidos — download paralelo"""
+    from fastapi.responses import StreamingResponse
+    import unicodedata
+
+    pontos = ler_excel()
+    concluidos = []
+    for p in pontos:
+        k = unicodedata.normalize("NFD", p.get("status","").upper())
+        k = "".join(c for c in k if unicodedata.category(c) != "Mn")
+        if "CONCLU" in k:
+            concluidos.append(p)
+
+    if not concluidos:
+        raise HTTPException(404, "Nenhum ponto concluido encontrado")
+
+    # Garante cache do root
+    now = time.time()
+    if "root_items" not in _cache_subpastas or (now - _cache_timestamp.get("root", 0)) > CACHE_TTL:
+        items = drive_list(DRIVE_ROOT_FOLDER)
+        _cache_subpastas["root_items"] = {
+            i["name"]: i["id"] for i in items
+            if i["mimeType"] == "application/vnd.google-apps.folder"
+        }
+        _cache_timestamp["root"] = now
+
+    def baixar_ponto(p):
+        """Retorna (nome_arquivo, bytes) ou None"""
+        pid = p["id"]
+        pasta_id = _cache_subpastas["root_items"].get(pid)
+        if not pasta_id:
+            return None
+        arquivos = drive_list(pasta_id)
+        for arq in arquivos:
+            mime = arq.get("mimeType", "")
+            nome = arq.get("name", "")
+            if (mime in {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         "application/vnd.ms-excel"}
+                    or nome.lower().endswith(".xlsx")):
+                try:
+                    url = f"{DRIVE_BASE_URL}/files/{arq['id']}?alt=media&key={DRIVE_API_KEY}"
+                    req = urllib.request.urlopen(url, timeout=30)
+                    dados = req.read()
+                    return (f"{pid}/{nome}", dados)
+                except Exception as e:
+                    print(f"Erro {pid}: {e}")
+        return None
+
+    # Download paralelo — até 8 pontos simultaneamente
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = {executor.submit(baixar_ponto, p): p for p in concluidos}
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    nome_arq, dados = result
+                    zf.writestr(nome_arq, dados)
+
+    zip_buffer.seek(0)
+    from datetime import datetime as dt
+    nome_zip = f"Contagens_Concluidas_{dt.now(BRASILIA).strftime('%d%m%Y')}.zip"
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={nome_zip}"}
+    )
+
+
+@app.get("/api/download/resumo-xlsx")
+def download_resumo():
+    """Gera planilha resumo dos pontos concluidos"""
+    from fastapi.responses import StreamingResponse
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime as dt
+    import unicodedata
+
+    pontos = ler_excel()
+    concluidos = []
+    for p in pontos:
+        k = unicodedata.normalize("NFD", p.get("status","").upper())
+        k = "".join(c for c in k if unicodedata.category(c) != "Mn")
+        if "CONCLU" in k:
+            concluidos.append(p)
+
+    if not concluidos:
+        raise HTTPException(404, "Nenhum ponto concluido encontrado")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Pontos Concluidos"
+
+    header_fill = PatternFill("solid", fgColor="1565C0")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    center      = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left        = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+    thin        = Side(style="thin", color="CCCCCC")
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    green_fill  = PatternFill("solid", fgColor="E8F5E9")
+    green_font  = Font(bold=True, color="1B5E20", size=11)
+
+    NCOLS = 10
+
+    ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1")
+    ws["A1"] = "RELATORIO DE PONTOS DE CONTAGEM CONCLUIDOS"
+    ws["A1"].font = Font(bold=True, color="FFFFFF", size=13)
+    ws["A1"].fill = PatternFill("solid", fgColor="0D47A1")
+    ws["A1"].alignment = center
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells(f"A2:{get_column_letter(NCOLS)}2")
+    ws["A2"] = f"COMOL Consultoria M.L.  |  SOP-CE  |  Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}"
+    ws["A2"].font = Font(italic=True, color="555555", size=10)
+    ws["A2"].fill = PatternFill("solid", fgColor="E3F2FD")
+    ws["A2"].alignment = center
+    ws.row_dimensions[2].height = 18
+
+    headers = ["N", "ID Ponto", "Codigo Trecho", "Rodovia",
+               "Descricao Inicio", "Descricao Fim",
+               "Latitude", "Longitude",
+               "Periodo Inicio", "Periodo Fim"]
+    ws.row_dimensions[3].height = 36
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+        cell.border = border
+
+    widths = [5, 10, 16, 10, 36, 36, 13, 13, 13, 13]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    alt_fill = PatternFill("solid", fgColor="F5F5F5")
+    for idx, p in enumerate(concluidos, 1):
+        row = idx + 3
+        ws.row_dimensions[row].height = 22
+        fill = alt_fill if idx % 2 == 0 else PatternFill("solid", fgColor="FFFFFF")
+        valores = [
+            idx,
+            p.get("id", ""),
+            p.get("trecho", ""),
+            p.get("rodovia", ""),
+            p.get("inicio", ""),
+            p.get("fim", ""),
+            p.get("lat", ""),
+            p.get("lng", ""),
+            p.get("periodo_inicio") or "-",
+            p.get("periodo_fim")    or "-",
+        ]
+        for col, val in enumerate(valores, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.fill = fill
+            cell.border = border
+            cell.alignment = center if col in [1,2,3,4,7,8,9,10] else left
+            cell.font = Font(size=10)
+
+    tot_row = len(concluidos) + 4
+    ws.merge_cells(f"A{tot_row}:{get_column_letter(NCOLS)}{tot_row}")
+    ws[f"A{tot_row}"] = f"TOTAL DE PONTOS CONCLUIDOS: {len(concluidos)}"
+    ws[f"A{tot_row}"].font = green_font
+    ws[f"A{tot_row}"].fill = green_fill
+    ws[f"A{tot_row}"].alignment = center
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    nome = f"Resumo_Contagens_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
+
+@app.get("/api/financeiro")
+def get_financeiro():
+    """Retorna dados financeiros para o painel da diretoria"""
+    if not FINANCEIRO_PATH.exists():
+        raise HTTPException(404, "Arquivo financeiro nao encontrado")
+
+    df_all = pd.read_excel(FINANCEIRO_PATH, sheet_name="Controle de Gastos",
+                           header=None, dtype=str)
+
+    tipos   = ["COMBUSTIVEL","ALIMENTACAO VIAGEM","AGUA","OUTROS","HOSPEDAGEM","SERVICOS DE TERCEIROS"]
+    viagens = []
+
     # Detecta viagens dinamicamente (colunas de valores: 2, 4, 6, 8, 10...)
     header_row = df_all.iloc[1]
     cols_viagem = []
