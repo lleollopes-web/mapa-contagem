@@ -512,12 +512,20 @@ def get_financeiro():
     tipos   = ["COMBUSTIVEL","ALIMENTACAO VIAGEM","AGUA","OUTROS","HOSPEDAGEM","SERVICOS DE TERCEIROS"]
     viagens = []
 
-    # Lê cabeçalhos de viagem (linha 2, colunas C, E, G = índices 2,4,6)
+    # Detecta viagens dinamicamente (colunas de valores: 2, 4, 6, 8, 10...)
     header_row = df_all.iloc[1]
-    for col_idx in [2, 4, 6]:
-        nome = str(header_row.iloc[col_idx]).strip() if pd.notna(header_row.iloc[col_idx]) else f"VIAGEM {len(viagens)+1}"
-        if nome == "nan": nome = f"VIAGEM {len(viagens)+1}"
-        viagens.append(nome)
+    cols_viagem = []
+    col_idx = 2
+    while col_idx < len(df_all.columns):
+        h = header_row.iloc[col_idx] if col_idx < len(header_row) else None
+        if pd.notna(h) and str(h).strip() not in ('nan',''):
+            nome = str(h).strip()
+            viagens.append(nome)
+            cols_viagem.append(col_idx)
+        col_idx += 2
+        # Para de buscar se encontrou coluna TOTAL (ultima)
+        if len(cols_viagem) > 0 and col_idx >= len(df_all.columns) - 2:
+            break
 
     # Lê dados (linhas 3 a 8, índices 2 a 7)
     itens = []
@@ -525,29 +533,29 @@ def get_financeiro():
         row = df_all.iloc[row_i]
         tipo = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else tipos[row_i-2]
         vals = []
-        for col_idx in [2, 4, 6]:
-            v = row.iloc[col_idx]
+        for col_idx in cols_viagem:
+            v = row.iloc[col_idx] if col_idx < len(row) else None
             try:
                 fv = float(str(v).replace(",",".").strip())
-                vals.append(0.0 if (fv != fv) else fv)  # NaN check
+                vals.append(0.0 if (fv != fv) else fv)
             except: vals.append(0.0)
         itens.append({"tipo": tipo, "valores": vals, "total": sum(vals)})
 
-    # Totais por viagem (linha 9, índice 8)
+    # Totais por viagem (linha 9)
     row_tot = df_all.iloc[8]
     totais_viagem = []
-    for col_idx in [2, 4, 6]:
-        v = row_tot.iloc[col_idx]
+    for col_idx in cols_viagem:
+        v = row_tot.iloc[col_idx] if col_idx < len(row_tot) else None
         try:
             fv = float(str(v).replace(",",".").strip())
             totais_viagem.append(0.0 if (fv != fv) else fv)
         except: totais_viagem.append(0.0)
 
-    # QTD pontos (linha 10, índice 9)
+    # QTD pontos (linha 10)
     row_qtd = df_all.iloc[9]
     qtd_pontos = []
-    for col_idx in [2, 4, 6]:
-        v = row_qtd.iloc[col_idx]
+    for col_idx in cols_viagem:
+        v = row_qtd.iloc[col_idx] if col_idx < len(row_qtd) else None
         try:
             fv = float(str(v).replace(",",".").strip())
             qtd_pontos.append(0 if (fv != fv) else int(fv))
