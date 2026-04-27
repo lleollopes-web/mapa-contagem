@@ -562,10 +562,12 @@ def get_financeiro():
         except: qtd_pontos.append(0)
 
     # Calcula totais por viagem somando os itens (ignora fórmulas do Excel)
-    totais_viagem_calc = [0.0, 0.0, 0.0]
+    n_viagens = len(viagens)
+    totais_viagem_calc = [0.0] * n_viagens
     for item in itens:
         for j, v in enumerate(item["valores"]):
-            totais_viagem_calc[j] += v
+            if j < n_viagens:
+                totais_viagem_calc[j] += v
 
     # Custo por ponto por viagem
     custo_por_ponto_viagem = []
