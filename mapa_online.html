@@ -249,6 +249,27 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-mes-card .mes-label { font-size:11px; font-weight:700; color:#880e4f; margin-bottom:4px; }
 .fin-mes-card .mes-qtd { font-size:22px; font-weight:800; color:#880e4f; }
 .fin-mes-card .mes-sub { font-size:10px; color:#ad1457; margin-top:2px; }
+
+/* ── Botão Imprimir ── */
+#btn-imprimir {
+  background:none; border:1.5px solid rgba(255,255,255,0.6);
+  color:#fff; padding:5px 14px; border-radius:20px; font-size:12px;
+  font-weight:600; cursor:pointer; display:flex; align-items:center;
+  gap:6px; transition:all 0.2s;
+}
+#btn-imprimir:hover { background:rgba(255,255,255,0.2); }
+
+/* ── Estilo de impressão ── */
+@media print {
+  body > *:not(#print-area) { display:none !important; }
+  #print-area {
+    display:block !important; position:fixed; inset:0;
+    background:#fff; padding:20px; z-index:99999;
+  }
+  #print-area .fin-header { border-radius:0; }
+  #print-area .fin-close,
+  #print-area #btn-imprimir { display:none !important; }
+}
 </style>
 </head>
 <body>
@@ -850,6 +871,62 @@ function sairSessao() {
   document.getElementById('login-pass').value = '';
   document.getElementById('login-erro').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
+}
+
+
+function imprimirFinanceiro() {
+  // Cria área de impressão temporária
+  var original = document.getElementById('fin-body').innerHTML;
+  var titulo = '<div style="text-align:center;margin-bottom:16px;">' +
+    '<h2 style="color:#880e4f;font-size:18px;margin:0">Controle de Gastos &mdash; COMOL</h2>' +
+    '<p style="color:#aaa;font-size:12px;margin:4px 0 0">Gerado em: ' + new Date().toLocaleString('pt-BR') + '</p>' +
+    '</div>';
+
+  var printArea = document.createElement('div');
+  printArea.id = 'print-area';
+  printArea.style.cssText = 'display:none;position:fixed;inset:0;background:#fff;padding:24px;z-index:99999;overflow:auto;';
+  printArea.innerHTML = titulo + document.getElementById('fin-body').innerHTML;
+  document.body.appendChild(printArea);
+
+  // Copia estilos da tabela financeira
+  var style = document.createElement('style');
+  style.textContent = `
+    #print-area { font-family:'Segoe UI',Arial,sans-serif; }
+    #print-area .fin-table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:16px; }
+    #print-area .fin-table th { background:#c2185b !important; color:#fff !important; padding:7px 8px; text-align:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #print-area .fin-table td { padding:6px 8px; border-bottom:1px solid #f0e0e8; text-align:center; }
+    #print-area .fin-table tr:nth-child(even) td { background:#fdf0f5; }
+    #print-area .fin-table .col-tipo { text-align:left; }
+    #print-area .fin-row-total td { background:#c2185b !important; color:#fff !important; font-weight:700; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #print-area .fin-row-qtd td, #print-area .fin-row-cpp td { background:#f8bbd9 !important; font-weight:700; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #print-area .fin-resumo { display:flex; gap:12px; margin-top:16px; }
+    #print-area .fin-card { background:#c2185b !important; color:#fff !important; border-radius:10px; padding:12px; text-align:center; flex:1; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #print-area .fin-card .label { font-size:10px; margin-bottom:4px; }
+    #print-area .fin-card .valor { font-size:18px; font-weight:800; }
+    #print-area .fin-mes-section { margin-top:16px; border-top:2px solid #f8bbd9; padding-top:12px; }
+    #print-area .fin-mes-titulo { font-size:11px; font-weight:700; color:#880e4f; text-transform:uppercase; margin-bottom:8px; }
+    #print-area .fin-mes-grid { display:flex; flex-wrap:wrap; gap:8px; }
+    #print-area .fin-mes-card { background:#f48fb1 !important; border-radius:8px; padding:10px 14px; text-align:center; min-width:100px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #print-area .fin-mes-card .mes-label { font-size:10px; font-weight:700; color:#880e4f; }
+    #print-area .fin-mes-card .mes-qtd { font-size:20px; font-weight:800; color:#880e4f; }
+    #print-area .fin-mes-card .mes-sub { font-size:9px; color:#ad1457; }
+    #print-area button { display:none !important; }
+    @media print {
+      body > *:not(#print-area) { display:none !important; }
+      #print-area { display:block !important; }
+    }
+  `;
+  document.head.appendChild(style);
+  printArea.style.display = 'block';
+
+  setTimeout(function() {
+    window.print();
+    // Remove após imprimir
+    setTimeout(function() {
+      document.body.removeChild(printArea);
+      document.head.removeChild(style);
+    }, 1000);
+  }, 300);
 }
 
 </script>
