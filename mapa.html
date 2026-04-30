@@ -344,8 +344,11 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 </div>
 <div id="painel-fin">
   <div class="fin-header">
-    <h3>&#128200; Controle de Gastos — COMOL</h3>
-    <button class="fin-close" onclick="fecharFinanceiro()">&#10005;</button>
+    <h3>&#128200; Controle de Gastos &mdash; COMOL</h3>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="btn-imprimir" onclick="imprimirFinanceiro()">&#128438; Imprimir / PDF</button>
+      <button class="fin-close" onclick="fecharFinanceiro()">&#10005;</button>
+    </div>
   </div>
   <div class="fin-body" id="fin-body">
     <div class="fin-loading">Carregando dados financeiros...</div>
