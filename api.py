@@ -280,7 +280,7 @@ def update_status(body: StatusUpdate):
     }
 
     # 1. Busca conteúdo atual do status.json
-    url_file = f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}?ref={GH_BRANCH_ENV}"
+    url_file = f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}"
     try:
         req = urllib.request.Request(url_file, headers=headers)
         resp = urllib.request.urlopen(req, timeout=15)
@@ -314,7 +314,6 @@ def update_status(body: StatusUpdate):
     payload = {
         "message": f"Status: {body.id} → {body.status.upper()}",
         "content": conteudo_b64,
-        "branch":  GH_BRANCH_ENV,
     }
     if sha:
         payload["sha"] = sha
