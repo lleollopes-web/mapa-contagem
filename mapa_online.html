@@ -981,46 +981,24 @@ function imprimirFinanceiro() {
   }, 300);
 }
 
-// ── Edição de Status via GitHub API ──────────────────────────────────────────
+// ── Edição de Status via servidor ────────────────────────────────────────────
 
-// CONFIGURAÇÃO — substitua pelo seu Personal Access Token (com permissão "contents: write")
-// Gere em: https://github.com/settings/tokens → Fine-grained token → mapa-contagem → Contents: Read/Write
-var GH_TOKEN  = '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';
-var GH_REPO   = 'lleollopes-web/mapa-contagem';
-var GH_FILE   = 'status.json';
-var GH_BRANCH = 'principal';
-
-// Cache local dos status sobrescritos
-var statusOverrides = {};   // { "E 01": "CONCLUIDO", ... }
-var statusJsonSha   = null; // SHA do arquivo no GitHub (necessário para update)
+var statusOverrides = {};
 var modalPontoId    = null;
 var modalStatusSel  = null;
 
-// Carrega status.json do GitHub ao iniciar
 function carregarStatusJson() {
-  var url = 'https://raw.githubusercontent.com/' + GH_REPO + '/refs/heads/' + GH_BRANCH + '/' + GH_FILE + '?t=' + Date.now();
+  var url = 'https://raw.githubusercontent.com/lleollopes-web/mapa-contagem/refs/heads/principal/status.json?t=' + Date.now();
   fetch(url)
     .then(function(r) { return r.ok ? r.json() : {}; })
     .then(function(data) {
       statusOverrides = data || {};
-      // Aplica nos pontos já carregados
       allMarkers.forEach(function(m) {
-        if (statusOverrides[m.p.id]) {
-          m.p.status = statusOverrides[m.p.id];
-        }
+        if (statusOverrides[m.p.id]) m.p.status = statusOverrides[m.p.id];
       });
       refreshColors();
     })
     .catch(function() { statusOverrides = {}; });
-}
-
-// Busca o SHA atual do arquivo (necessário para o PUT da API do GitHub)
-function buscarSha(callback) {
-  var url = 'https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE + '?ref=' + GH_BRANCH;
-  fetch(url, { headers: { 'Authorization': 'token ' + GH_TOKEN } })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(data) { callback(data ? data.sha : null); })
-    .catch(function() { callback(null); });
 }
 
 function abrirModalStatus(pid) {
@@ -1029,11 +1007,9 @@ function abrirModalStatus(pid) {
   document.getElementById('modal-sub').textContent = 'Ponto: ' + pid;
   document.getElementById('modal-feedback').textContent = '';
   document.getElementById('modal-salvar').disabled = true;
-  // Destaca status atual
   ['CONCLUIDO','EM ANDAMENTO','NAO INICIADO'].forEach(function(s) {
     document.getElementById('opt-' + s).classList.remove('selecionado');
   });
-  // Status atual do ponto
   var atual = (statusOverrides[pid] || '').toUpperCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
   if (atual === 'CONCLUIDO' || atual === 'EM ANDAMENTO' || atual === 'NAO INICIADO') {
@@ -1060,83 +1036,55 @@ function selecionarStatus(s) {
 
 function salvarStatus() {
   if (!modalPontoId || !modalStatusSel) return;
-  if (!GH_TOKEN || GH_TOKEN === 'COLE_SEU_TOKEN_AQUI') {
-    document.getElementById('modal-feedback').innerHTML =
-      '<span style="color:#c62828">&#10060; Token GitHub não configurado. Edite o mapa_online.html e adicione o token.</span>';
-    return;
-  }
-
   var btn = document.getElementById('modal-salvar');
   btn.disabled = true;
   btn.textContent = '⏳ Salvando...';
   document.getElementById('modal-feedback').textContent = '';
 
-  // Atualiza cache local
-  statusOverrides[modalPontoId] = modalStatusSel;
-  var conteudo = JSON.stringify(statusOverrides, null, 2);
-  var conteudoB64 = btoa(unescape(encodeURIComponent(conteudo)));
-
-  buscarSha(function(sha) {
-    var body = {
-      message: 'Status: ' + modalPontoId + ' → ' + modalStatusSel,
-      content: conteudoB64,
-      branch:  GH_BRANCH,
-    };
-    if (sha) body.sha = sha;
-
-    fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE, {
-      method:  'PUT',
-      headers: {
-        'Authorization': 'token ' + GH_TOKEN,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-    .then(function(r) {
-      if (!r.ok) return r.json().then(function(e){ throw new Error(e.message || r.status); });
-      return r.json();
-    })
-    .then(function(data) {
-      statusJsonSha = data.content ? data.content.sha : null;
-      // Aplica no ponto local
-      allMarkers.forEach(function(m) {
-        if (m.p.id === modalPontoId) {
-          m.p.status = modalStatusSel;
-        }
-      });
-      refreshColors();
-      // Atualiza tag de status no painel aberto
-      var tagEls = document.querySelectorAll('#tab-info .tag');
-      tagEls.forEach(function(el) {
-        var row = el.closest('.row');
-        if (row && row.querySelector('.lbl') && row.querySelector('.lbl').textContent.includes('Status')) {
-          el.className = 'tag ' + statusClass(modalStatusSel);
-          var labels = {'CONCLUIDO':'CONCLUIDO','EM ANDAMENTO':'EM ANDAMENTO','NAO INICIADO':'NAO INICIADO'};
-          el.textContent = labels[modalStatusSel] || modalStatusSel;
-        }
-      });
-      document.getElementById('modal-feedback').innerHTML =
-        '<span style="color:#2e7d32">&#10003; Salvo com sucesso!</span>';
-      btn.textContent = '&#128190; Salvar';
-      btn.disabled = false;
-      setTimeout(fecharModalStatus, 1200);
-    })
-    .catch(function(e) {
-      // Reverte cache local em caso de erro
-      document.getElementById('modal-feedback').innerHTML =
-        '<span style="color:#c62828">&#10060; Erro: ' + e.message + '</span>';
-      btn.textContent = '&#128190; Salvar';
-      btn.disabled = false;
+  fetch(API_BASE + '/api/status/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: modalPontoId, status: modalStatusSel }),
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(e){ throw new Error(e.detail || r.status); });
+    return r.json();
+  })
+  .then(function() {
+    statusOverrides[modalPontoId] = modalStatusSel;
+    allMarkers.forEach(function(m) {
+      if (m.p.id === modalPontoId) m.p.status = modalStatusSel;
     });
+    refreshColors();
+    // Atualiza tag no painel
+    document.querySelectorAll('#tab-info .row').forEach(function(row) {
+      var lbl = row.querySelector('.lbl');
+      if (lbl && lbl.textContent.includes('Status')) {
+        var tag = row.querySelector('.tag');
+        if (tag) {
+          tag.className = 'tag ' + statusClass(modalStatusSel);
+          tag.textContent = modalStatusSel;
+        }
+      }
+    });
+    document.getElementById('modal-feedback').innerHTML =
+      '<span style="color:#2e7d32">&#10003; Salvo com sucesso!</span>';
+    btn.innerHTML = '&#128190; Salvar';
+    btn.disabled = false;
+    setTimeout(fecharModalStatus, 1200);
+  })
+  .catch(function(e) {
+    document.getElementById('modal-feedback').innerHTML =
+      '<span style="color:#c62828">&#10060; Erro: ' + e.message + '</span>';
+    btn.innerHTML = '&#128190; Salvar';
+    btn.disabled = false;
   });
 }
 
-// Fecha modal ao clicar fora
 document.getElementById('modal-status').addEventListener('click', function(e) {
   if (e.target === this) fecharModalStatus();
 });
 
-// Carrega status.json ao iniciar (após pontos carregados)
 setTimeout(carregarStatusJson, 800);
 
 </script>

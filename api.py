@@ -251,6 +251,82 @@ def raiz():
         return HTMLResponse(HTML_PATH.read_text(encoding="utf-8"))
     return HTMLResponse("<h2>mapa.html não encontrado</h2>")
 
+# ── Edição de status via GitHub API (token fica seguro no servidor) ────────────
+GH_TOKEN_ENV  = os.environ.get("GH_TOKEN", "")
+GH_REPO_ENV   = "lleollopes-web/mapa-contagem"
+GH_FILE_ENV   = "status.json"
+GH_BRANCH_ENV = "principal"
+GH_API_BASE   = "https://api.github.com"
+
+STATUS_VALIDOS = {"CONCLUIDO", "EM ANDAMENTO", "NAO INICIADO"}
+
+from pydantic import BaseModel
+
+class StatusUpdate(BaseModel):
+    id: str
+    status: str
+
+@app.post("/api/status/update")
+def update_status(body: StatusUpdate):
+    if not GH_TOKEN_ENV:
+        raise HTTPException(500, "GH_TOKEN não configurado no servidor")
+    if body.status.upper() not in STATUS_VALIDOS:
+        raise HTTPException(400, f"Status inválido: {body.status}")
+
+    headers = {
+        "Authorization": f"token {GH_TOKEN_ENV}",
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.github+json",
+    }
+
+    # 1. Busca conteúdo atual do status.json
+    url_file = f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}?ref={GH_BRANCH_ENV}"
+    try:
+        req = urllib.request.Request(url_file, headers=headers)
+        resp = urllib.request.urlopen(req, timeout=15)
+        file_data = json.loads(resp.read())
+        sha = file_data["sha"]
+        import base64 as b64mod
+        conteudo_atual = json.loads(b64mod.b64decode(file_data["content"]).decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            sha = None
+            conteudo_atual = {}
+        else:
+            raise HTTPException(502, f"Erro ao ler status.json: {e}")
+    except Exception as e:
+        raise HTTPException(502, f"Erro ao ler status.json: {e}")
+
+    # 2. Atualiza e faz commit
+    conteudo_atual[body.id] = body.status.upper()
+    novo_conteudo = json.dumps(conteudo_atual, ensure_ascii=False, indent=2)
+    import base64 as b64mod2
+    conteudo_b64 = b64mod2.b64encode(novo_conteudo.encode("utf-8")).decode("ascii")
+
+    payload = {
+        "message": f"Status: {body.id} → {body.status.upper()}",
+        "content": conteudo_b64,
+        "branch":  GH_BRANCH_ENV,
+    }
+    if sha:
+        payload["sha"] = sha
+
+    try:
+        req2 = urllib.request.Request(
+            f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="PUT",
+        )
+        urllib.request.urlopen(req2, timeout=15)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        raise HTTPException(502, f"Erro ao salvar: {e.code} {detail}")
+    except Exception as e:
+        raise HTTPException(502, f"Erro ao salvar: {e}")
+
+    return JSONResponse({"ok": True, "id": body.id, "status": body.status.upper()})
+
 @app.get("/api/pontos")
 def get_pontos():
     pontos = ler_excel()
