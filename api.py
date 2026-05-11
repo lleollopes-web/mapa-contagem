@@ -287,14 +287,22 @@ def update_status(body: StatusUpdate):
         file_data = json.loads(resp.read())
         sha = file_data["sha"]
         import base64 as b64mod
-        conteudo_atual = json.loads(b64mod.b64decode(file_data["content"]).decode("utf-8"))
+        content_raw = file_data["content"].replace("\n","").replace(" ","")
+        try:
+            conteudo_atual = json.loads(b64mod.b64decode(content_raw).decode("utf-8"))
+        except:
+            conteudo_atual = {}
+        print(f"  status.json lido, sha={sha}, entries={len(conteudo_atual)}")
     except urllib.error.HTTPError as e:
+        body_err = e.read().decode("utf-8", errors="replace")
+        print(f"  Erro HTTP ao ler status.json: {e.code} {body_err}")
         if e.code == 404:
             sha = None
             conteudo_atual = {}
         else:
-            raise HTTPException(502, f"Erro ao ler status.json: {e}")
+            raise HTTPException(502, f"Erro ao ler status.json: {e.code} {body_err}")
     except Exception as e:
+        print(f"  Erro ao ler status.json: {e}")
         raise HTTPException(502, f"Erro ao ler status.json: {e}")
 
     # 2. Atualiza e faz commit
