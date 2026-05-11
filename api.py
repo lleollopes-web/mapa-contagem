@@ -25,7 +25,7 @@ except ImportError:
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 BASE_DIR  = Path(__file__).parent
-HTML_PATH       = BASE_DIR / "mapa.html"
+HTML_PATH       = BASE_DIR / "mapa_online.html"
 FINANCEIRO_PATH = BASE_DIR / "financeiro.xlsx"
 
 def encontrar_excel():
