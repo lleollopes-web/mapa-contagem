@@ -583,6 +583,125 @@ def download_resumo():
     )
 
 
+@app.get("/api/download/vmd-xlsx")
+def download_vmd():
+    """Gera planilha VDM com todas as classes de veiculos dos pontos com dados coletados"""
+    from fastapi.responses import StreamingResponse
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime as dt
+
+    df_raw   = pd.read_excel(EXCEL_PATH, sheet_name=ABA_DADOS,  header=None)
+    df_lista = pd.read_excel(EXCEL_PATH, sheet_name=ABA_PONTOS)
+
+    CLASSES = ["MOTO","PASS","UTIL","2C/2CB","3C/3CB",
+               "2S1","2S2","2S3","3S1","3S2","3S3",
+               "4C","4CD","2C2","2C3","3C2","3C3","2I3","3I3","BIT","ROD/TRIT"]
+
+    mask = pd.to_numeric(df_raw[28], errors="coerce") > 0
+    dados = df_raw[mask].copy()
+    if dados.empty:
+        raise HTTPException(404, "Nenhum ponto com dados coletados encontrado")
+
+    rows = []
+    for _, row in dados.iterrows():
+        pid         = str(row[0]).strip()
+        info        = df_lista[df_lista["ID"].astype(str).str.strip() == pid]
+        rodovia     = str(row[1]) if pd.notna(row[1]) else ""
+        trecho      = str(row[2]) if pd.notna(row[2]) else ""
+        inicio_desc = info["DESCRICAO INICIO"].values[0] if len(info) and "DESCRICAO INICIO" in info.columns else (info["DESCRI\u00c7\u00c3O IN\u00cdCIO"].values[0] if len(info) else "")
+        fim_desc    = info["DESCRICAO FINAL"].values[0]  if len(info) and "DESCRICAO FINAL" in info.columns else (info["DESCRI\u00c7\u00c3O FINAL"].values[0] if len(info) else "")
+        periodo_ini = str(row[5])[:10] if pd.notna(row[5]) else "-"
+        periodo_fim = str(row[6])[:10] if pd.notna(row[6]) else "-"
+        vals        = [int(row[7+i]) if pd.notna(row[7+i]) and str(row[7+i]) not in ["nan",""] else 0
+                       for i in range(21)]
+        total       = int(row[28]) if pd.notna(row[28]) else 0
+        leves    = vals[0]+vals[1]+vals[2]
+        onibus   = vals[3]+vals[4]
+        caminhao = sum(vals[5:])
+        rows.append([pid, rodovia, trecho, inicio_desc, fim_desc,
+                     periodo_ini, periodo_fim] + vals + [leves, onibus, caminhao, total])
+
+    def hfill(cor): return PatternFill("solid", fgColor=cor)
+    thin = Side(style="thin", color="CCCCCC")
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    ctr  = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    lft  = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+    NCOLS = 32
+
+    wb = Workbook(); ws = wb.active; ws.title = "VDM Trechos"
+
+    ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1")
+    ws["A1"] = "PLANILHA RESUMO - VDM TRECHOS CONCLUIDOS"
+    ws["A1"].font = Font(bold=True, color="FFFFFF", size=13)
+    ws["A1"].fill = hfill("0D47A1"); ws["A1"].alignment = ctr
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells(f"A2:{get_column_letter(NCOLS)}2")
+    ws["A2"] = f"COMOL Consultoria M.L.  |  SOP-CE  |  Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}  |  {len(rows)} pontos"
+    ws["A2"].font = Font(italic=True, color="555555", size=10)
+    ws["A2"].fill = hfill("E3F2FD"); ws["A2"].alignment = ctr
+    ws.row_dimensions[2].height = 18
+
+    for ini, fim, txt, cor in [
+        ("A3","G3","","1565C0"), ("H3","J3","VEICULOS LEVES","1976D2"),
+        ("K3","L3","ONIBUS","7B1FA2"), ("M3","W3","CAMINHAO","E65100"),
+        ("X3","Z3","SUBTOTAIS","2E7D32"), ("AA3","AF3","VDM TOTAL","0D47A1")]:
+        ws.merge_cells(f"{ini}:{fim}")
+        c = ws[ini]; c.value = txt
+        c.font = Font(bold=True, color="FFFFFF", size=10)
+        c.fill = hfill(cor); c.alignment = ctr; c.border = brd
+    ws.row_dimensions[3].height = 20
+
+    for ci, h in enumerate(["N","ID","Rodovia","Trecho","Descricao Inicio","Descricao Fim",
+            "Periodo"] + CLASSES + ["Leves","Onibus","Caminhao","VDM TOTAL"], 1):
+        c = ws.cell(row=4, column=ci, value=h)
+        c.font = Font(bold=True, color="FFFFFF", size=10)
+        c.fill = hfill("1565C0"); c.alignment = ctr; c.border = brd
+    ws.row_dimensions[4].height = 36
+
+    for i, w in enumerate([5,8,10,16,34,34,22]+[7]*21+[9,9,11,11], 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    totais_cls = [0]*21
+    total_leves = total_onibus = total_cam = total_geral = 0
+    for idx, r in enumerate(rows, 1):
+        rn = idx + 4; ws.row_dimensions[rn].height = 18
+        bg = hfill("F5F5F5") if idx % 2 == 0 else hfill("FFFFFF")
+        vals = r[7:28]; leves = r[28]; onibus = r[29]; cam = r[30]; total = r[31]
+        for ci, val in enumerate([idx]+r[:7]+vals+[leves,onibus,cam,total], 1):
+            c = ws.cell(row=rn, column=ci, value=val)
+            c.border = brd; c.font = Font(size=10)
+            c.alignment = lft if ci in [5,6] else ctr
+            if ci == 32: c.font = Font(bold=True, color="0D47A1", size=10); c.fill = hfill("E3F2FD")
+            elif ci in [29,30,31]: c.font = Font(bold=True, color="1B5E20", size=10); c.fill = hfill("E8F5E9")
+            else: c.fill = bg
+        for i, v in enumerate(vals): totais_cls[i] += v
+        total_leves += leves; total_onibus += onibus; total_cam += cam; total_geral += total
+
+    tr = len(rows) + 5; ws.row_dimensions[tr].height = 22
+    ws.merge_cells(f"A{tr}:G{tr}")
+    ws[f"A{tr}"] = f"TOTAL GERAL - {len(rows)} pontos"
+    ws[f"A{tr}"].font = Font(bold=True, color="1B5E20", size=11)
+    ws[f"A{tr}"].fill = hfill("E8F5E9"); ws[f"A{tr}"].alignment = ctr; ws[f"A{tr}"].border = brd
+    for i, v in enumerate(totais_cls, 8):
+        c = ws.cell(row=tr, column=i, value=v)
+        c.font = Font(bold=True, color="333333", size=10)
+        c.fill = hfill("E8F5E9"); c.alignment = ctr; c.border = brd
+    for ci, val in [(29,total_leves),(30,total_onibus),(31,total_cam),(32,total_geral)]:
+        c = ws.cell(row=tr, column=ci, value=val)
+        c.font = Font(bold=True, color="1B5E20" if ci < 32 else "0D47A1", size=11)
+        c.fill = hfill("E8F5E9"); c.alignment = ctr; c.border = brd
+
+    ws.freeze_panes = "A5"
+    ws.auto_filter.ref = f"A4:{get_column_letter(NCOLS)}{len(rows)+4}"
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    nome = f"VDM_Trechos_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    return StreamingResponse(buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome}"})
+
+
+
 @app.get("/api/financeiro")
 def get_financeiro():
     """Retorna dados financeiros para o painel da diretoria"""

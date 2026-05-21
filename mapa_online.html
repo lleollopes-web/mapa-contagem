@@ -179,6 +179,8 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .dl-btn-xlsx { background:#1565c0; color:#fff; }
 .dl-btn-zip:hover  { background:#2e7d32; }
 .dl-btn-xlsx:hover { background:#1976d2; }
+#btn-vmd { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+#btn-vmd:hover { background:#388e3c; }
 .dl-btn.loading { opacity:0.6; pointer-events:none; }
 
 /* ── Painel Financeiro ── */
@@ -335,6 +337,12 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     </button>
     <button class="dl-btn dl-btn-xlsx" onclick="downloadResumo(this)" title="Planilha resumo dos pontos concluídos">
       &#128202; Resumo Concluídos
+    </button>
+    <button class="dl-btn" id="btn-vmd"
+            onclick="downloadVmd(this)" style="display:none"
+            title="Planilha VDM com todas as classes de veículos"
+            style="background:#1b5e20;color:#fff;border-color:#1b5e20">
+      &#128202; Planilha VDM — Trechos
     </button>
     <button class="dl-btn dl-btn-zip" onclick="downloadZip(this)" title="ZIP com todos os xlsx dos pontos concluídos">
       &#128229; Download Planilhas 15min
@@ -734,7 +742,7 @@ function fazerLogin() {
     document.getElementById('login-overlay').style.display = 'none';
     if (usuario.perfil === 'diretoria') {
       document.getElementById('btn-financeiro').style.display = 'inline-flex';
-      // Mostra botão editar status se painel estiver aberto
+      document.getElementById('btn-vmd').style.display = 'inline-flex';
       var btnEd = document.getElementById('btn-editar-st');
       if (btnEd) btnEd.style.display = 'block';
     } else {
@@ -760,9 +768,39 @@ if (sessionStorage.getItem('autenticado') === '1') {
   perfilAtual = sessionStorage.getItem('perfil') || 'normal';
   if (perfilAtual === 'diretoria') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
+    document.getElementById('btn-vmd').style.display = 'inline-flex';
   }
 }
 
+
+function downloadVmd(btn) {
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '&#9203; Gerando...';
+  fetch(API_BASE + '/api/download/vmd-xlsx')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erro ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var hoje = new Date();
+      var dd = String(hoje.getDate()).padStart(2,'0');
+      var mm = String(hoje.getMonth()+1).padStart(2,'0');
+      a.href = url;
+      a.download = 'VDM_Trechos_' + dd + mm + hoje.getFullYear() + '.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    })
+    .catch(function(e) {
+      alert('Erro ao gerar planilha VDM: ' + e.message);
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    });
+}
 
 function downloadResumo(btn) {
   btn.classList.add('loading');
