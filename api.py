@@ -618,8 +618,9 @@ def download_vmd():
         leves    = vals[0]+vals[1]+vals[2]
         onibus   = vals[3]+vals[4]
         caminhao = sum(vals[5:])
+        periodo = f"{periodo_ini} – {periodo_fim}" if periodo_ini != "-" else "-"
         rows.append([pid, rodovia, trecho, inicio_desc, fim_desc,
-                     periodo_ini, periodo_fim] + vals + [leves, onibus, caminhao, total])
+                     periodo] + vals + [leves, onibus, caminhao, total])
 
     def hfill(cor): return PatternFill("solid", fgColor=cor)
     thin = Side(style="thin", color="CCCCCC")
@@ -667,8 +668,8 @@ def download_vmd():
     for idx, r in enumerate(rows, 1):
         rn = idx + 4; ws.row_dimensions[rn].height = 18
         bg = hfill("F5F5F5") if idx % 2 == 0 else hfill("FFFFFF")
-        vals = r[7:28]; leves = r[28]; onibus = r[29]; cam = r[30]; total = r[31]
-        for ci, val in enumerate([idx]+r[:7]+vals+[leves,onibus,cam,total], 1):
+        vals = r[6:27]; leves = r[27]; onibus = r[28]; cam = r[29]; total = r[30]
+        for ci, val in enumerate([idx]+r[:6]+vals+[leves,onibus,cam,total], 1):
             c = ws.cell(row=rn, column=ci, value=val)
             c.border = brd; c.font = Font(size=10)
             c.alignment = lft if ci in [5,6] else ctr
