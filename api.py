@@ -610,8 +610,8 @@ def download_vmd():
         trecho      = str(row[2]) if pd.notna(row[2]) else ""
         inicio_desc = info["DESCRICAO INICIO"].values[0] if len(info) and "DESCRICAO INICIO" in info.columns else (info["DESCRI\u00c7\u00c3O IN\u00cdCIO"].values[0] if len(info) else "")
         fim_desc    = info["DESCRICAO FINAL"].values[0]  if len(info) and "DESCRICAO FINAL" in info.columns else (info["DESCRI\u00c7\u00c3O FINAL"].values[0] if len(info) else "")
-        periodo_ini = str(row[5])[:10] if pd.notna(row[5]) else "-"
-        periodo_fim = str(row[6])[:10] if pd.notna(row[6]) else "-"
+        periodo_ini = pd.to_datetime(row[5]).strftime('%d/%m/%Y') if pd.notna(row[5]) else "-"
+        periodo_fim = pd.to_datetime(row[6]).strftime('%d/%m/%Y') if pd.notna(row[6]) else "-"
         vals        = [int(row[7+i]) if pd.notna(row[7+i]) and str(row[7+i]) not in ["nan",""] else 0
                        for i in range(21)]
         total       = int(row[28]) if pd.notna(row[28]) else 0
