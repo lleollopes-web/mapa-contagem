@@ -746,6 +746,7 @@ function fazerLogin() {
       if (btnEd) btnEd.style.display = 'block';
     } else {
       document.getElementById('btn-financeiro').style.display = 'none';
+      document.getElementById('btn-vmd').style.display = 'none';
     }
   } else {
     document.getElementById('login-erro').style.display = 'block';
@@ -949,13 +950,12 @@ function sairSessao() {
   sessionStorage.removeItem('autenticado');
   sessionStorage.removeItem('perfil');
   perfilAtual = '';
-  // Esconde botão financeiro
   var btnFin = document.getElementById('btn-financeiro');
   if (btnFin) btnFin.style.display = 'none';
-  // Fecha painéis abertos
+  var btnVmd = document.getElementById('btn-vmd');
+  if (btnVmd) btnVmd.style.display = 'none';
   fecharFinanceiro();
   closePanel();
-  // Limpa campos e mostra tela de login
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-erro').style.display = 'none';
