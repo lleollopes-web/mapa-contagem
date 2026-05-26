@@ -200,13 +200,12 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 
 /* ── Botão Sair ── */
 #btn-sair {
-  position:absolute; bottom:20px; right:20px; z-index:1000;
-  background:rgba(255,255,255,0.92); border:1.5px solid #e0e0e0;
-  color:#555; padding:7px 16px; border-radius:20px; font-size:12px;
+  background:rgba(255,255,255,0.15); border:1.5px solid rgba(255,255,255,0.4);
+  color:#fff; padding:6px 16px; border-radius:20px; font-size:12px;
   font-weight:600; cursor:pointer; display:flex; align-items:center;
-  gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:all 0.2s;
+  gap:6px; transition:all 0.2s; white-space:nowrap; flex-shrink:0;
 }
-#btn-sair:hover { background:#ffebee; border-color:#ef9a9a; color:#c62828; }
+#btn-sair:hover { background:rgba(255,255,255,0.25); border-color:rgba(255,255,255,0.7); }
 
 /* ── Mobile responsivo ── */
 @media (max-width: 768px) {
@@ -300,6 +299,9 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 <header>
   <h1>&#128205; Pontos de Contagem de Tr&#225;fego &mdash; Cear&#225;</h1>
   <span id="header-info">Carregando...<span id="atualizado"></span></span>
+  <button id="btn-sair" onclick="sairSessao()" title="Encerrar sessão">
+    &#128274; Sair
+  </button>
 </header>
 <div id="controls">
 
@@ -376,10 +378,6 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   <button id="lb-next" onclick="lbNav(1);event.stopPropagation()">&#8250;</button>
   <div id="lb-caption"></div>
 </div>
-<button id="btn-sair" onclick="sairSessao()" title="Encerrar sessão">
-  &#128274; Sair
-</button>
-
 <footer id="footer-info">Mapa de Contagem de Tr&#225;fego &mdash; COMOL Consultoria M.L.</footer>
 
 <script>
