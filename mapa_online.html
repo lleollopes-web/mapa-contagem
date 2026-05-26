@@ -163,6 +163,10 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 /* ── Painel Financeiro ── */
 .dl-btn-fin { background: linear-gradient(90deg,#880e4f,#c2185b); color:#fff; }
 .dl-btn-fin:hover { background: #ad1457; }
+#btn-vmd { background:#e65100; color:#fff; border-color:#e65100; }
+#btn-vmd:hover { background:#f4511e; }
+#btn-fotos-zip { background:#ad1457; color:#fff; border-color:#ad1457; }
+#btn-fotos-zip:hover { background:#c2185b; }
 #painel-fin {
   position:absolute; top:110px; left:15px; width:780px; max-width:calc(100vw - 30px);
   background:#fff; border:1px solid #e0e0e0; border-radius:14px; z-index:1000;
@@ -315,6 +319,16 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     <button class="dl-btn dl-btn-xlsx" onclick="downloadResumo(this)" title="Planilha resumo dos pontos concluídos">
       &#128202; Resumo Concluídos
     </button>
+    <button class="dl-btn" id="btn-vmd"
+            onclick="downloadVmd(this)" style="display:none"
+            title="Planilha VDM com todas as classes de veículos">
+      &#128202; Planilha VDM — Trechos
+    </button>
+    <button class="dl-btn" id="btn-fotos-zip"
+            onclick="downloadFotosZip(this)" style="display:none"
+            title="Download ZIP com todas as fotos de todos os pontos">
+      &#128247; Download Todas as Fotos
+    </button>
     <button class="dl-btn dl-btn-zip" onclick="downloadZip(this)" title="ZIP com todos os xlsx dos pontos concluídos">
       &#128229; Download Planilhas 15min
     </button>
@@ -384,43 +398,9 @@ var GRUPOS    = {
 var colorMode='st', lbFotos=[], lbIdx=0, carrFotos=[], carrIdx=0;
 var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
-var map = L.map('map', {zoomControl:false}).setView([-4.8,-39.5],7);
-L.control.zoom({position:'topleft'}).addTo(map);
-
-var camadaRua = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OpenStreetMap © CartoDB', maxZoom:19});
-var camadaSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'© Esri © Maxar © Earthstar Geographics', maxZoom:19});
-var camadaAtual = 'rua';
-camadaRua.addTo(map);
-
-// Botão satélite
-var btnSat = L.Control.extend({
-  options: { position: 'topleft' },
-  onAdd: function() {
-    var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-    div.innerHTML = '<a href="#" id="btn-sat" title="Alternar satélite/mapa" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;font-size:16px;text-decoration:none;color:#333;background:#fff;">🛰️</a>';
-    L.DomEvent.on(div, 'click', function(e) {
-      L.DomEvent.stopPropagation(e);
-      L.DomEvent.preventDefault(e);
-      if (camadaAtual === 'rua') {
-        map.removeLayer(camadaRua);
-        camadaSat.addTo(map);
-        camadaAtual = 'sat';
-        div.querySelector('a').innerHTML = '🗺️';
-        div.querySelector('a').title = 'Voltar para mapa padrão';
-      } else {
-        map.removeLayer(camadaSat);
-        camadaRua.addTo(map);
-        camadaAtual = 'rua';
-        div.querySelector('a').innerHTML = '🛰️';
-        div.querySelector('a').title = 'Visualizar satélite';
-      }
-    });
-    return div;
-  }
-});
-new btnSat().addTo(map);
+var map = L.map('map').setView([-4.8,-39.5],7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19}).addTo(map);
 var groups={ALL:L.layerGroup()};
 
 function corPonto(p){
@@ -722,8 +702,12 @@ function fazerLogin() {
     document.getElementById('login-overlay').style.display = 'none';
     if (usuario.perfil === 'diretoria') {
       document.getElementById('btn-financeiro').style.display = 'inline-flex';
+      document.getElementById('btn-vmd').style.display = 'inline-flex';
+      document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
     } else {
       document.getElementById('btn-financeiro').style.display = 'none';
+      document.getElementById('btn-vmd').style.display = 'none';
+      document.getElementById('btn-fotos-zip').style.display = 'none';
     }
   } else {
     document.getElementById('login-erro').style.display = 'block';
@@ -745,6 +729,8 @@ if (sessionStorage.getItem('autenticado') === '1') {
   perfilAtual = sessionStorage.getItem('perfil') || 'normal';
   if (perfilAtual === 'diretoria') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
+    document.getElementById('btn-vmd').style.display = 'inline-flex';
+    document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
   }
 }
 
@@ -897,17 +883,46 @@ function sairSessao() {
   sessionStorage.removeItem('autenticado');
   sessionStorage.removeItem('perfil');
   perfilAtual = '';
-  // Esconde botão financeiro
-  var btnFin = document.getElementById('btn-financeiro');
-  if (btnFin) btnFin.style.display = 'none';
-  // Fecha painéis abertos
+  ['btn-financeiro','btn-vmd','btn-fotos-zip'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
   fecharFinanceiro();
   closePanel();
-  // Limpa campos e mostra tela de login
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-erro').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
+}
+
+function downloadFotosZip(btn) {
+  if (!confirm('Isso irá baixar TODAS as fotos de todos os pontos do Drive em um único arquivo ZIP.\n\nDependendo da quantidade de fotos, pode demorar alguns minutos.\n\nDeseja continuar?')) return;
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '&#9203; Baixando fotos...';
+  fetch(API_BASE + '/api/download/fotos-zip')
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(e){ throw new Error(e.detail || r.status); });
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a   = document.createElement('a');
+      var hoje = new Date();
+      var dd = String(hoje.getDate()).padStart(2,'0');
+      var mm = String(hoje.getMonth()+1).padStart(2,'0');
+      a.href = url;
+      a.download = 'Fotos_Pontos_' + dd + mm + hoje.getFullYear() + '.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    })
+    .catch(function(e) {
+      alert('Erro ao baixar fotos: ' + e.message);
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    });
 }
 
 

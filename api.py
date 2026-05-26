@@ -25,7 +25,7 @@ except ImportError:
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 BASE_DIR  = Path(__file__).parent
-HTML_PATH       = BASE_DIR / "mapa_online.html"
+HTML_PATH       = BASE_DIR / "mapa.html"
 FINANCEIRO_PATH = BASE_DIR / "financeiro.xlsx"
 
 def encontrar_excel():
@@ -250,89 +250,6 @@ def raiz():
     if HTML_PATH.exists():
         return HTMLResponse(HTML_PATH.read_text(encoding="utf-8"))
     return HTMLResponse("<h2>mapa.html não encontrado</h2>")
-
-# ── Edição de status via GitHub API (token fica seguro no servidor) ────────────
-GH_TOKEN_ENV  = os.environ.get("GH_TOKEN", "")
-GH_REPO_ENV   = "lleollopes-web/mapa-contagem"
-GH_FILE_ENV   = "status.json"
-GH_BRANCH_ENV = "principal"
-GH_API_BASE   = "https://api.github.com"
-
-STATUS_VALIDOS = {"CONCLUIDO", "EM ANDAMENTO", "NAO INICIADO"}
-
-from pydantic import BaseModel
-
-class StatusUpdate(BaseModel):
-    id: str
-    status: str
-
-@app.post("/api/status/update")
-def update_status(body: StatusUpdate):
-    if not GH_TOKEN_ENV:
-        raise HTTPException(500, "GH_TOKEN não configurado no servidor")
-    if body.status.upper() not in STATUS_VALIDOS:
-        raise HTTPException(400, f"Status inválido: {body.status}")
-
-    headers = {
-        "Authorization": f"token {GH_TOKEN_ENV}",
-        "Content-Type": "application/json",
-        "Accept": "application/vnd.github+json",
-    }
-
-    # 1. Busca conteúdo atual do status.json
-    url_file = f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}"
-    try:
-        req = urllib.request.Request(url_file, headers=headers)
-        resp = urllib.request.urlopen(req, timeout=15)
-        file_data = json.loads(resp.read())
-        sha = file_data["sha"]
-        import base64 as b64mod
-        content_raw = file_data["content"].replace("\n","").replace(" ","")
-        try:
-            conteudo_atual = json.loads(b64mod.b64decode(content_raw).decode("utf-8"))
-        except:
-            conteudo_atual = {}
-        print(f"  status.json lido, sha={sha}, entries={len(conteudo_atual)}")
-    except urllib.error.HTTPError as e:
-        body_err = e.read().decode("utf-8", errors="replace")
-        print(f"  Erro HTTP ao ler status.json: {e.code} {body_err}")
-        if e.code == 404:
-            sha = None
-            conteudo_atual = {}
-        else:
-            raise HTTPException(502, f"Erro ao ler status.json: {e.code} {body_err}")
-    except Exception as e:
-        print(f"  Erro ao ler status.json: {e}")
-        raise HTTPException(502, f"Erro ao ler status.json: {e}")
-
-    # 2. Atualiza e faz commit
-    conteudo_atual[body.id] = body.status.upper()
-    novo_conteudo = json.dumps(conteudo_atual, ensure_ascii=False, indent=2)
-    import base64 as b64mod2
-    conteudo_b64 = b64mod2.b64encode(novo_conteudo.encode("utf-8")).decode("ascii")
-
-    payload = {
-        "message": f"Status: {body.id} → {body.status.upper()}",
-        "content": conteudo_b64,
-    }
-    if sha:
-        payload["sha"] = sha
-
-    try:
-        req2 = urllib.request.Request(
-            f"{GH_API_BASE}/repos/{GH_REPO_ENV}/contents/{GH_FILE_ENV}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers,
-            method="PUT",
-        )
-        urllib.request.urlopen(req2, timeout=15)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")
-        raise HTTPException(502, f"Erro ao salvar: {e.code} {detail}")
-    except Exception as e:
-        raise HTTPException(502, f"Erro ao salvar: {e}")
-
-    return JSONResponse({"ok": True, "id": body.id, "status": body.status.upper()})
 
 @app.get("/api/pontos")
 def get_pontos():
@@ -583,123 +500,75 @@ def download_resumo():
     )
 
 
-@app.get("/api/download/vmd-xlsx")
-def download_vmd():
-    """Gera planilha VDM com todas as classes de veiculos dos pontos com dados coletados"""
+@app.get("/api/download/fotos-zip")
+def download_fotos_zip():
+    """Baixa todas as fotos de todos os pontos do Drive e retorna ZIP organizado por ponto."""
     from fastapi.responses import StreamingResponse
-    from openpyxl.utils import get_column_letter
     from datetime import datetime as dt
 
-    df_raw   = pd.read_excel(EXCEL_PATH, sheet_name=ABA_DADOS,  header=None)
-    df_lista = pd.read_excel(EXCEL_PATH, sheet_name=ABA_PONTOS)
+    print("  [fotos-zip] Iniciando listagem do Drive...")
+    root_items = drive_list(DRIVE_ROOT_FOLDER)
+    pastas_pontos = [i for i in root_items if i["mimeType"] == "application/vnd.google-apps.folder"]
+    print(f"  [fotos-zip] {len(pastas_pontos)} pastas de pontos encontradas")
 
-    CLASSES = ["MOTO","PASS","UTIL","2C/2CB","3C/3CB",
-               "2S1","2S2","2S3","3S1","3S2","3S3",
-               "4C","4CD","2C2","2C3","3C2","3C3","2I3","3I3","BIT","ROD/TRIT"]
+    def listar_fotos_ponto(pasta):
+        pid_name = pasta["name"]
+        pid_id   = pasta["id"]
+        fotos    = []
+        items    = drive_list(pid_id)
+        for item in items:
+            if item.get("mimeType","") in EXTS_FOTO:
+                fotos.append((pid_name, item["name"], item["id"]))
+        for item in items:
+            if item["mimeType"] == "application/vnd.google-apps.folder":
+                sub_items = drive_list(item["id"])
+                sub_nome  = item["name"]
+                for f in sub_items:
+                    if f.get("mimeType","") in EXTS_FOTO:
+                        fotos.append((pid_name, f"{sub_nome}/{f['name']}", f["id"]))
+        return fotos
 
-    mask = pd.to_numeric(df_raw[28], errors="coerce") > 0
-    dados = df_raw[mask].copy()
-    if dados.empty:
-        raise HTTPException(404, "Nenhum ponto com dados coletados encontrado")
+    todas_fotos = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = {ex.submit(listar_fotos_ponto, p): p for p in pastas_pontos}
+        for fut in as_completed(futures):
+            try:
+                todas_fotos.extend(fut.result())
+            except Exception as e:
+                print(f"  [fotos-zip] Erro listando ponto: {e}")
 
-    rows = []
-    for _, row in dados.iterrows():
-        pid         = str(row[0]).strip()
-        info        = df_lista[df_lista["ID"].astype(str).str.strip() == pid]
-        rodovia     = str(row[1]) if pd.notna(row[1]) else ""
-        trecho      = str(row[2]) if pd.notna(row[2]) else ""
-        inicio_desc = info["DESCRICAO INICIO"].values[0] if len(info) and "DESCRICAO INICIO" in info.columns else (info["DESCRI\u00c7\u00c3O IN\u00cdCIO"].values[0] if len(info) else "")
-        fim_desc    = info["DESCRICAO FINAL"].values[0]  if len(info) and "DESCRICAO FINAL" in info.columns else (info["DESCRI\u00c7\u00c3O FINAL"].values[0] if len(info) else "")
-        periodo_ini = pd.to_datetime(row[5]).strftime('%d/%m/%Y') if pd.notna(row[5]) else "-"
-        periodo_fim = pd.to_datetime(row[6]).strftime('%d/%m/%Y') if pd.notna(row[6]) else "-"
-        vals        = [int(row[7+i]) if pd.notna(row[7+i]) and str(row[7+i]) not in ["nan",""] else 0
-                       for i in range(21)]
-        total       = int(row[28]) if pd.notna(row[28]) else 0
-        leves    = vals[0]+vals[1]+vals[2]
-        onibus   = vals[3]+vals[4]
-        caminhao = sum(vals[5:])
-        periodo = f"{periodo_ini} – {periodo_fim}" if periodo_ini != "-" else "-"
-        rows.append([pid, rodovia, trecho, inicio_desc, fim_desc,
-                     periodo] + vals + [leves, onibus, caminhao, total])
+    print(f"  [fotos-zip] {len(todas_fotos)} fotos encontradas")
+    if not todas_fotos:
+        raise HTTPException(404, "Nenhuma foto encontrada no Drive")
 
-    def hfill(cor): return PatternFill("solid", fgColor=cor)
-    thin = Side(style="thin", color="CCCCCC")
-    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
-    ctr  = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    lft  = Alignment(horizontal="left",   vertical="center", wrap_text=True)
-    NCOLS = 32
+    def baixar_foto(item):
+        pid_name, nome, fid = item
+        url = f"https://www.googleapis.com/drive/v3/files/{fid}?alt=media&key={DRIVE_API_KEY}"
+        try:
+            req  = urllib.request.Request(url, headers={"User-Agent":"Mozilla/5.0"})
+            resp = urllib.request.urlopen(req, timeout=30)
+            return (pid_name, nome, resp.read())
+        except Exception as e:
+            print(f"  [fotos-zip] Erro baixando {nome}: {e}")
+            return None
 
-    wb = Workbook(); ws = wb.active; ws.title = "VDM Trechos"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = [ex.submit(baixar_foto, item) for item in todas_fotos]
+            for fut in as_completed(futures):
+                result = fut.result()
+                if result:
+                    pid_name, nome, dados = result
+                    zf.writestr(f"{pid_name}/{nome}", dados)
 
-    ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1")
-    ws["A1"] = "PLANILHA RESUMO - VDM TRECHOS CONCLUIDOS"
-    ws["A1"].font = Font(bold=True, color="FFFFFF", size=13)
-    ws["A1"].fill = hfill("0D47A1"); ws["A1"].alignment = ctr
-    ws.row_dimensions[1].height = 30
-
-    ws.merge_cells(f"A2:{get_column_letter(NCOLS)}2")
-    ws["A2"] = f"COMOL Consultoria M.L.  |  SOP-CE  |  Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}  |  {len(rows)} pontos"
-    ws["A2"].font = Font(italic=True, color="555555", size=10)
-    ws["A2"].fill = hfill("E3F2FD"); ws["A2"].alignment = ctr
-    ws.row_dimensions[2].height = 18
-
-    for ini, fim, txt, cor in [
-        ("A3","G3","","1565C0"), ("H3","J3","VEICULOS LEVES","1976D2"),
-        ("K3","L3","ONIBUS","7B1FA2"), ("M3","W3","CAMINHAO","E65100"),
-        ("X3","Z3","SUBTOTAIS","2E7D32"), ("AA3","AF3","VDM TOTAL","0D47A1")]:
-        ws.merge_cells(f"{ini}:{fim}")
-        c = ws[ini]; c.value = txt
-        c.font = Font(bold=True, color="FFFFFF", size=10)
-        c.fill = hfill(cor); c.alignment = ctr; c.border = brd
-    ws.row_dimensions[3].height = 20
-
-    for ci, h in enumerate(["N","ID","Rodovia","Trecho","Descricao Inicio","Descricao Fim",
-            "Periodo"] + CLASSES + ["Leves","Onibus","Caminhao","VDM TOTAL"], 1):
-        c = ws.cell(row=4, column=ci, value=h)
-        c.font = Font(bold=True, color="FFFFFF", size=10)
-        c.fill = hfill("1565C0"); c.alignment = ctr; c.border = brd
-    ws.row_dimensions[4].height = 36
-
-    for i, w in enumerate([5,8,10,16,34,34,22]+[7]*21+[9,9,11,11], 1):
-        ws.column_dimensions[get_column_letter(i)].width = w
-
-    totais_cls = [0]*21
-    total_leves = total_onibus = total_cam = total_geral = 0
-    for idx, r in enumerate(rows, 1):
-        rn = idx + 4; ws.row_dimensions[rn].height = 18
-        bg = hfill("F5F5F5") if idx % 2 == 0 else hfill("FFFFFF")
-        vals = r[6:27]; leves = r[27]; onibus = r[28]; cam = r[29]; total = r[30]
-        for ci, val in enumerate([idx]+r[:6]+vals+[leves,onibus,cam,total], 1):
-            c = ws.cell(row=rn, column=ci, value=val)
-            c.border = brd; c.font = Font(size=10)
-            c.alignment = lft if ci in [5,6] else ctr
-            if ci == 32: c.font = Font(bold=True, color="0D47A1", size=10); c.fill = hfill("E3F2FD")
-            elif ci in [29,30,31]: c.font = Font(bold=True, color="1B5E20", size=10); c.fill = hfill("E8F5E9")
-            else: c.fill = bg
-        for i, v in enumerate(vals): totais_cls[i] += v
-        total_leves += leves; total_onibus += onibus; total_cam += cam; total_geral += total
-
-    tr = len(rows) + 5; ws.row_dimensions[tr].height = 22
-    ws.merge_cells(f"A{tr}:G{tr}")
-    ws[f"A{tr}"] = f"TOTAL GERAL - {len(rows)} pontos"
-    ws[f"A{tr}"].font = Font(bold=True, color="1B5E20", size=11)
-    ws[f"A{tr}"].fill = hfill("E8F5E9"); ws[f"A{tr}"].alignment = ctr; ws[f"A{tr}"].border = brd
-    for i, v in enumerate(totais_cls, 8):
-        c = ws.cell(row=tr, column=i, value=v)
-        c.font = Font(bold=True, color="333333", size=10)
-        c.fill = hfill("E8F5E9"); c.alignment = ctr; c.border = brd
-    for ci, val in [(29,total_leves),(30,total_onibus),(31,total_cam),(32,total_geral)]:
-        c = ws.cell(row=tr, column=ci, value=val)
-        c.font = Font(bold=True, color="1B5E20" if ci < 32 else "0D47A1", size=11)
-        c.fill = hfill("E8F5E9"); c.alignment = ctr; c.border = brd
-
-    ws.freeze_panes = "A5"
-    ws.auto_filter.ref = f"A4:{get_column_letter(NCOLS)}{len(rows)+4}"
-    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
-    nome = f"VDM_Trechos_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    buf.seek(0)
+    tamanho = buf.getbuffer().nbytes / 1024 / 1024
+    print(f"  [fotos-zip] ZIP gerado: {tamanho:.1f} MB")
+    nome_zip = f"Fotos_Pontos_{dt.now(BRASILIA).strftime('%d%m%Y')}.zip"
     return StreamingResponse(buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={nome}"})
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={nome_zip}"})
 
 
 
