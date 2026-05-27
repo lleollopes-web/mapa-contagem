@@ -396,9 +396,39 @@ var GRUPOS    = {
 var colorMode='st', lbFotos=[], lbIdx=0, carrFotos=[], carrIdx=0;
 var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
-var map = L.map('map').setView([-4.8,-39.5],7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19}).addTo(map);
+var map = L.map('map', {zoomControl:false}).setView([-4.8,-39.5],7);
+L.control.zoom({position:'topleft'}).addTo(map);
+
+var camadaRua = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CartoDB', maxZoom:19});
+var camadaSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {attribution:'© Esri © Maxar © Earthstar Geographics', maxZoom:19});
+var camadaAtual = 'rua';
+camadaRua.addTo(map);
+
+var BtnSat = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function() {
+    var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    div.innerHTML = '<a href="#" id="btn-sat" title="Visualizar satélite" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;font-size:16px;text-decoration:none;color:#333;background:#fff;">🛰️</a>';
+    L.DomEvent.on(div, 'click', function(e) {
+      L.DomEvent.stopPropagation(e); L.DomEvent.preventDefault(e);
+      if (camadaAtual === 'rua') {
+        map.removeLayer(camadaRua); camadaSat.addTo(map);
+        camadaAtual = 'sat';
+        div.querySelector('a').innerHTML = '🗺️';
+        div.querySelector('a').title = 'Voltar para mapa padrão';
+      } else {
+        map.removeLayer(camadaSat); camadaRua.addTo(map);
+        camadaAtual = 'rua';
+        div.querySelector('a').innerHTML = '🛰️';
+        div.querySelector('a').title = 'Visualizar satélite';
+      }
+    });
+    return div;
+  }
+});
+new BtnSat().addTo(map);
 var groups={ALL:L.layerGroup()};
 
 function corPonto(p){
