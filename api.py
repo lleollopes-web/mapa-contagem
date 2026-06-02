@@ -25,7 +25,7 @@ except ImportError:
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 BASE_DIR  = Path(__file__).parent
-HTML_PATH       = BASE_DIR / "mapa_online.html"
+HTML_PATH       = BASE_DIR / "mapa.html"
 FINANCEIRO_PATH = BASE_DIR / "financeiro.xlsx"
 
 def encontrar_excel():
@@ -1372,6 +1372,152 @@ def get_financeiro():
         "pontos_por_mes":        pontos_por_mes,
     })
 
+
+
+@app.get("/api/download/vmd-trechos")
+def download_vmd_trechos():
+    """Gera planilha VMD/VDM consolidada por trecho, com classes de veículos."""
+    from fastapi.responses import StreamingResponse
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime as dt
+    from collections import defaultdict
+
+    pontos = ler_excel()
+    if not pontos:
+        raise HTTPException(404, "Nenhum ponto encontrado")
+
+    def parse_data_br(v):
+        if not v or v == "-":
+            return None
+        try:
+            return dt.strptime(str(v), "%d/%m/%Y")
+        except Exception:
+            return None
+
+    grupos = defaultdict(lambda: {
+        "trecho": "", "rodovias": set(), "inicios": set(), "fins": set(),
+        "ids": [], "qtd_pontos": 0, "qtd_com_dados": 0,
+        "total": 0, "classes": {c: 0 for c in CLASSES},
+        "datas_ini": [], "datas_fim": []
+    })
+
+    for p in pontos:
+        chave = limpar(p.get("trecho")) or limpar(p.get("rodovia")) or limpar(p.get("id"))
+        g = grupos[chave]
+        g["trecho"] = chave
+        if p.get("rodovia"): g["rodovias"].add(str(p.get("rodovia")))
+        if p.get("inicio"):  g["inicios"].add(str(p.get("inicio")))
+        if p.get("fim"):     g["fins"].add(str(p.get("fim")))
+        g["ids"].append(str(p.get("id", "")))
+        g["qtd_pontos"] += 1
+        total = int(p.get("total") or 0)
+        g["total"] += total
+        if total > 0:
+            g["qtd_com_dados"] += 1
+        for cls in CLASSES:
+            try:
+                g["classes"][cls] += int((p.get("contagens") or {}).get(cls, 0) or 0)
+            except Exception:
+                pass
+        di = parse_data_br(p.get("periodo_inicio"))
+        df = parse_data_br(p.get("periodo_fim"))
+        if di: g["datas_ini"].append(di)
+        if df: g["datas_fim"].append(df)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "VMD por Trecho"
+
+    header_fill = PatternFill("solid", fgColor="E65100")
+    title_fill  = PatternFill("solid", fgColor="BF360C")
+    sub_fill    = PatternFill("solid", fgColor="FFF3E0")
+    alt_fill    = PatternFill("solid", fgColor="F7F7F7")
+    white_fill  = PatternFill("solid", fgColor="FFFFFF")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    title_font  = Font(bold=True, color="FFFFFF", size=13)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left   = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    thin   = Side(style="thin", color="CCCCCC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    base_headers = [
+        "N", "Código Trecho", "Rodovia", "Descrição Início", "Descrição Fim",
+        "IDs dos Pontos", "Qtd. Pontos", "Pontos com Dados",
+        "Período Início", "Período Fim", "Dias", "Volume Total Coletado", "VMD Total"
+    ]
+    headers = base_headers + ["VMD " + c for c in CLASSES] + ["Coletado " + c for c in CLASSES]
+    ncols = len(headers)
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+    ws.cell(1, 1).value = "PLANILHA VMD / VDM — CONSOLIDADO POR TRECHO"
+    ws.cell(1, 1).font = title_font
+    ws.cell(1, 1).fill = title_fill
+    ws.cell(1, 1).alignment = center
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
+    ws.cell(2, 1).value = f"COMOL Consultoria M.L. | SOP-CE | Gerado em: {dt.now(BRASILIA).strftime('%d/%m/%Y %H:%M')}"
+    ws.cell(2, 1).font = Font(italic=True, color="555555", size=10)
+    ws.cell(2, 1).fill = sub_fill
+    ws.cell(2, 1).alignment = center
+
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(3, col_idx, h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+        cell.border = border
+    ws.row_dimensions[3].height = 42
+
+    rows = []
+    for g in grupos.values():
+        data_ini = min(g["datas_ini"]) if g["datas_ini"] else None
+        data_fim = max(g["datas_fim"]) if g["datas_fim"] else None
+        dias = 1
+        if data_ini and data_fim:
+            dias = max((data_fim - data_ini).days + 1, 1)
+        vmd_total = round(g["total"] / dias, 2) if dias else g["total"]
+        vmd_classes = [round(g["classes"][c] / dias, 2) if dias else g["classes"][c] for c in CLASSES]
+        coletado_classes = [g["classes"][c] for c in CLASSES]
+        rows.append([
+            g["trecho"], ", ".join(sorted(g["rodovias"])),
+            "; ".join(sorted(g["inicios"]))[:500], "; ".join(sorted(g["fins"]))[:500],
+            ", ".join(g["ids"]), g["qtd_pontos"], g["qtd_com_dados"],
+            data_ini.strftime("%d/%m/%Y") if data_ini else "-",
+            data_fim.strftime("%d/%m/%Y") if data_fim else "-",
+            dias, g["total"], vmd_total, vmd_classes, coletado_classes
+        ])
+
+    rows.sort(key=lambda r: (r[1], r[0]))
+    for idx, r in enumerate(rows, 1):
+        row_idx = idx + 3
+        fill = alt_fill if idx % 2 == 0 else white_fill
+        values = [idx] + r[0:12] + r[12] + r[13]
+        for col_idx, val in enumerate(values, 1):
+            cell = ws.cell(row_idx, col_idx, val)
+            cell.fill = fill
+            cell.border = border
+            cell.font = Font(size=9)
+            cell.alignment = left if col_idx in [2,3,4,5,6] else center
+
+    widths = [5, 18, 12, 34, 34, 26, 11, 14, 13, 13, 9, 17, 13]
+    widths += [11] * len(CLASSES)
+    widths += [12] * len(CLASSES)
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:{get_column_letter(ncols)}{len(rows)+3}"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    nome = f"VMD_Trechos_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
 
 @app.get("/api/status")
 def status():
