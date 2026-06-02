@@ -25,7 +25,7 @@ except ImportError:
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 BASE_DIR  = Path(__file__).parent
-HTML_PATH       = BASE_DIR / "mapa.html"
+HTML_PATH       = BASE_DIR / "mapa_online.html"
 FINANCEIRO_PATH = BASE_DIR / "financeiro.xlsx"
 
 def encontrar_excel():
@@ -249,7 +249,7 @@ def ler_excel():
 def raiz():
     if HTML_PATH.exists():
         return HTMLResponse(HTML_PATH.read_text(encoding="utf-8"))
-    return HTMLResponse("<h2>mapa.html não encontrado</h2>")
+    return HTMLResponse("<h2>mapa_online.html não encontrado</h2>")
 
 @app.get("/api/pontos")
 def get_pontos():
