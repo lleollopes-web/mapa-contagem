@@ -12,6 +12,7 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:#f5f5f5; color:#222; 
 header { background:linear-gradient(90deg,#1a3a6b,#1565c0); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid #e94560; flex-shrink:0; }
 header h1 { font-size:15px; font-weight:700; color:#fff; }
 header span { font-size:12px; color:#bbdefb; }
+.header-right { display:flex; align-items:center; gap:14px; margin-left:auto; }
 #controls { background:#fff; padding:8px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #ddd; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 
 .legend-item { display:flex; align-items:center; gap:6px; cursor:pointer; padding:4px 10px; border-radius:20px; border:2px solid transparent; transition:all 0.2s; font-size:12px; font-weight:600; color:#444; }
@@ -200,13 +201,13 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 
 /* ── Botão Sair ── */
 #btn-sair {
-  position:absolute; bottom:20px; right:20px; z-index:1000;
-  background:rgba(255,255,255,0.92); border:1.5px solid #e0e0e0;
-  color:#555; padding:7px 16px; border-radius:20px; font-size:12px;
-  font-weight:600; cursor:pointer; display:flex; align-items:center;
-  gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12); transition:all 0.2s;
+  position:static; z-index:auto;
+  background:rgba(255,255,255,0.14); border:1.5px solid rgba(255,255,255,0.45);
+  color:#fff; padding:7px 16px; border-radius:20px; font-size:12px;
+  font-weight:700; cursor:pointer; display:flex; align-items:center;
+  gap:6px; box-shadow:none; transition:all 0.2s; white-space:nowrap;
 }
-#btn-sair:hover { background:#ffebee; border-color:#ef9a9a; color:#c62828; }
+#btn-sair:hover { background:rgba(255,255,255,0.25); border-color:#fff; color:#fff; }
 
 /* ── Mobile responsivo ── */
 @media (max-width: 768px) {
@@ -230,7 +231,7 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   #search-box { width:140px; font-size:12px; }
 
   /* Botão sair menor */
-  #btn-sair { font-size:11px; padding:5px 12px; bottom:14px; right:10px; }
+  #btn-sair { font-size:11px; padding:5px 12px; }
 
   /* Header menor */
   header h1 { font-size:13px; }
@@ -299,7 +300,12 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 
 <header>
   <h1>&#128205; Pontos de Contagem de Tr&#225;fego &mdash; Cear&#225;</h1>
-  <span id="header-info">Carregando...<span id="atualizado"></span></span>
+  <div class="header-right">
+    <span id="header-info">Carregando...<span id="atualizado"></span></span>
+    <button id="btn-sair" onclick="sairSessao()" title="Encerrar sessão">
+      &#128274; Sair
+    </button>
+  </div>
 </header>
 <div id="controls">
 
@@ -320,12 +326,12 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
       &#128202; Resumo Concluídos
     </button>
     <button class="dl-btn" id="btn-vmd"
-            onclick="downloadVmd(this)" style="display:none"
-            title="Planilha VMD com todas as classes de veículos">
-      &#128202; Planilha VMD — Trechos
+            onclick="downloadVmd(this)" style="display:inline-flex"
+            title="Planilha VDM com todas as classes de veículos">
+      &#128202; Planilha VDM — Trechos
     </button>
     <button class="dl-btn" id="btn-fotos-zip"
-            onclick="downloadFotosZip(this)" style="display:none"
+            onclick="downloadFotosZip(this)" style="display:inline-flex"
             title="Download ZIP com todas as fotos de todos os pontos">
       &#128247; Download Todas as Fotos
     </button>
@@ -376,10 +382,6 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   <button id="lb-next" onclick="lbNav(1);event.stopPropagation()">&#8250;</button>
   <div id="lb-caption"></div>
 </div>
-<button id="btn-sair" onclick="sairSessao()" title="Encerrar sessão">
-  &#128274; Sair
-</button>
-
 <footer id="footer-info">Mapa de Contagem de Tr&#225;fego &mdash; COMOL Consultoria M.L.</footer>
 
 <script>
@@ -735,41 +737,12 @@ if (sessionStorage.getItem('autenticado') === '1') {
 }
 
 
-function downloadResumo(btn) {
-  btn.classList.add('loading');
-  btn.textContent = '⏳ Gerando...';
-  fetch(API_BASE + '/api/download/resumo-xlsx')
-    .then(function(r) {
-      if (!r.ok) throw new Error('Erro ' + r.status);
-      return r.blob();
-    })
-    .then(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      var hoje = new Date();
-      var dd = String(hoje.getDate()).padStart(2,'0');
-      var mm = String(hoje.getMonth()+1).padStart(2,'0');
-      var yy = hoje.getFullYear();
-      a.download = 'Resumo_Contagens_' + dd + mm + yy + '.xlsx';
-      a.click();
-      URL.revokeObjectURL(url);
-      btn.classList.remove('loading');
-      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
-    })
-    .catch(function(e) {
-      alert('Erro ao gerar resumo: ' + e.message);
-      btn.classList.remove('loading');
-      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
-    });
-}
-
-
 function downloadVmd(btn) {
   var orig = btn.innerHTML;
   btn.disabled = true;
   btn.classList.add('loading');
   btn.innerHTML = '&#9203; Gerando VMD...';
+
   fetch(API_BASE + '/api/download/vmd-trechos')
     .then(function(r) {
       if (!r.ok) {
@@ -800,6 +773,36 @@ function downloadVmd(btn) {
       btn.disabled = false;
       btn.classList.remove('loading');
       btn.innerHTML = orig;
+    });
+}
+
+
+function downloadResumo(btn) {
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Gerando...';
+  fetch(API_BASE + '/api/download/resumo-xlsx')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Erro ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var hoje = new Date();
+      var dd = String(hoje.getDate()).padStart(2,'0');
+      var mm = String(hoje.getMonth()+1).padStart(2,'0');
+      var yy = hoje.getFullYear();
+      a.download = 'Resumo_Contagens_' + dd + mm + yy + '.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
+    })
+    .catch(function(e) {
+      alert('Erro ao gerar resumo: ' + e.message);
+      btn.classList.remove('loading');
+      btn.innerHTML = '&#128202; Resumo Conclu\u00eddos';
     });
 }
 
