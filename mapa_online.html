@@ -94,16 +94,49 @@ header span { font-size:12px; color:#bbdefb; }
 #lb-caption { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); color:#ddd; font-size:12px; background:rgba(0,0,0,0.5); padding:4px 14px; border-radius:20px; }
 footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-size:11px; color:#bbb; text-align:right; flex-shrink:0; }
 .leaflet-tooltip { background:#fff !important; border:1px solid #90caf9 !important; color:#1a237e !important; font-size:12px; border-radius:6px; padding:5px 8px; }
-.leaflet-tooltip-top:before { border-top-color:#90caf9 !important; }
-#btn-satelite {
-  background:#37474f; color:#fff; border:none; border-radius:8px;
-  padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer;
-  display:flex; align-items:center; gap:6px; white-space:nowrap;
-  transition:background 0.2s; flex-shrink:0;
+.ctrl-satelite {
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(0,0,0,0.18);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  margin-top: 8px !important;
 }
-#btn-satelite:hover { background:#546e7a; }
-#btn-satelite.ativo { background:#1565c0; }
-#btn-satelite.ativo:hover { background:#1976d2; }
+.ctrl-satelite a {
+  display: flex !important;
+  align-items: center;
+  gap: 5px;
+  width: 32px !important;
+  height: 32px !important;
+  justify-content: center;
+  font-size: 16px !important;
+  color: #37474f !important;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background 0.18s, color 0.18s;
+  cursor: pointer;
+}
+.ctrl-satelite a:hover { background: rgba(21,101,192,0.12) !important; color: #1565c0 !important; }
+.ctrl-satelite a.sat-on { background: rgba(21,101,192,0.18) !important; color: #1565c0 !important; }
+.ctrl-satelite-label {
+  position: absolute;
+  left: 38px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(50,50,50,0.82);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.ctrl-satelite a:hover .ctrl-satelite-label { opacity: 1; }
+.leaflet-tooltip-top:before { border-top-color:#90caf9 !important; }
 
 /* ── Tela de Login ── */
 #login-overlay {
@@ -348,9 +381,6 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
       &#128229; Download Planilhas 15min
     </button>
   </div>
-  <button id="btn-satelite" onclick="toggleSatelite()" title="Alternar vista satelite">
-    &#127758; Sat&#233;lite
-  </button>
   <input type="text" id="search-box" placeholder="&#128269; Buscar ID, rodovia..." oninput="searchPoints(this.value)">
 </div>
 <div id="map"></div>
@@ -414,25 +444,46 @@ var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
 var map = L.map('map').setView([-4.8,-39.5],7);
 var tileNormal = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19});
+  {attribution:'\u00a9 OpenStreetMap \u00a9 CartoDB', maxZoom:19});
 var tileSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'© Esri, Maxar, Earthstar Geographics',maxZoom:19});
+  {attribution:'\u00a9 Esri, Maxar, Earthstar Geographics', maxZoom:19});
 tileNormal.addTo(map);
 var sateliteAtivo = false;
-function toggleSatelite() {
-  var btn = document.getElementById('btn-satelite');
+
+var CtrlSatelite = L.Control.extend({
+  options: { position: 'topleft' },
+  onAdd: function() {
+    var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control ctrl-satelite');
+    container.style.position = 'relative';
+    var a = L.DomUtil.create('a', '', container);
+    a.href = '#';
+    a.title = 'Sat\u00e9lite';
+    a.innerHTML = '<span>\uD83D\uDEF0</span><span class="ctrl-satelite-label">Sat\u00e9lite</span>';
+    L.DomEvent.on(a, 'click', function(e) {
+      L.DomEvent.preventDefault(e);
+      toggleSatelite(a);
+    });
+    return container;
+  }
+});
+new CtrlSatelite().addTo(map);
+
+function toggleSatelite(a) {
+  if (!a) a = document.querySelector('.ctrl-satelite a');
   if (!sateliteAtivo) {
     map.removeLayer(tileNormal);
     tileSatelite.addTo(map);
     sateliteAtivo = true;
-    btn.classList.add('ativo');
-    btn.innerHTML = '&#127758; Normal';
+    a.classList.add('sat-on');
+    a.title = 'Mapa normal';
+    a.innerHTML = '<span>\uD83D\uDDFA</span><span class="ctrl-satelite-label">Normal</span>';
   } else {
     map.removeLayer(tileSatelite);
     tileNormal.addTo(map);
     sateliteAtivo = false;
-    btn.classList.remove('ativo');
-    btn.innerHTML = '&#127758; Satélite';
+    a.classList.remove('sat-on');
+    a.title = 'Sat\u00e9lite';
+    a.innerHTML = '<span>\uD83D\uDEF0</span><span class="ctrl-satelite-label">Sat\u00e9lite</span>';
   }
 }
 var groups={ALL:L.layerGroup()};
