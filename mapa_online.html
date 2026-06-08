@@ -94,48 +94,6 @@ header span { font-size:12px; color:#bbdefb; }
 #lb-caption { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); color:#ddd; font-size:12px; background:rgba(0,0,0,0.5); padding:4px 14px; border-radius:20px; }
 footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-size:11px; color:#bbb; text-align:right; flex-shrink:0; }
 .leaflet-tooltip { background:#fff !important; border:1px solid #90caf9 !important; color:#1a237e !important; font-size:12px; border-radius:6px; padding:5px 8px; }
-.ctrl-satelite {
-  background: rgba(255,255,255,0.82);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(0,0,0,0.18);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-  margin-top: 8px !important;
-}
-.ctrl-satelite a {
-  display: flex !important;
-  align-items: center;
-  gap: 5px;
-  width: 32px !important;
-  height: 32px !important;
-  justify-content: center;
-  font-size: 16px !important;
-  color: #37474f !important;
-  text-decoration: none;
-  border-radius: 5px;
-  transition: background 0.18s, color 0.18s;
-  cursor: pointer;
-}
-.ctrl-satelite a:hover { background: rgba(21,101,192,0.12) !important; color: #1565c0 !important; }
-.ctrl-satelite a.sat-on { background: rgba(21,101,192,0.18) !important; color: #1565c0 !important; }
-.ctrl-satelite-label {
-  position: absolute;
-  left: 38px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(50,50,50,0.82);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 5px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.ctrl-satelite a:hover .ctrl-satelite-label { opacity: 1; }
 .leaflet-tooltip-top:before { border-top-color:#90caf9 !important; }
 
 /* ── Tela de Login ── */
@@ -317,6 +275,49 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   #print-area .fin-close,
   #print-area #btn-imprimir { display:none !important; }
 }
+
+.ctrl-satelite {
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(0,0,0,0.18);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  margin-top: 8px !important;
+}
+.ctrl-satelite a {
+  display: flex !important;
+  align-items: center;
+  width: 32px !important;
+  height: 32px !important;
+  justify-content: center;
+  font-size: 17px !important;
+  color: #37474f !important;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background 0.18s, color 0.18s;
+  cursor: pointer;
+  position: relative;
+}
+.ctrl-satelite a:hover { background: rgba(21,101,192,0.12) !important; color: #1565c0 !important; }
+.ctrl-satelite a.sat-on { background: rgba(21,101,192,0.22) !important; color: #1565c0 !important; }
+.ctrl-satelite-tip {
+  position: absolute;
+  left: 38px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(40,40,40,0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.ctrl-satelite a:hover .ctrl-satelite-tip { opacity: 1; }
 </style>
 </head>
 <body>
@@ -444,26 +445,21 @@ var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
 var map = L.map('map').setView([-4.8,-39.5],7);
 var tileNormal = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'\u00a9 OpenStreetMap \u00a9 CartoDB', maxZoom:19});
+  {attribution:'© OpenStreetMap © CartoDB', maxZoom:19});
 var tileSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'\u00a9 Esri, Maxar, Earthstar Geographics', maxZoom:19});
+  {attribution:'© Esri, Maxar, Earthstar Geographics', maxZoom:19});
 tileNormal.addTo(map);
 var sateliteAtivo = false;
 
 var CtrlSatelite = L.Control.extend({
   options: { position: 'topleft' },
   onAdd: function() {
-    var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control ctrl-satelite');
-    container.style.position = 'relative';
-    var a = L.DomUtil.create('a', '', container);
-    a.href = '#';
-    a.title = 'Sat\u00e9lite';
-    a.innerHTML = '<span>\uD83D\uDEF0</span><span class="ctrl-satelite-label">Sat\u00e9lite</span>';
-    L.DomEvent.on(a, 'click', function(e) {
-      L.DomEvent.preventDefault(e);
-      toggleSatelite(a);
-    });
-    return container;
+    var c = L.DomUtil.create('div', 'leaflet-bar leaflet-control ctrl-satelite');
+    var a = L.DomUtil.create('a', '', c);
+    a.href = '#'; a.title = 'Satélite';
+    a.innerHTML = '<span>&#128640;</span><span class="ctrl-satelite-tip">Satélite</span>';
+    L.DomEvent.on(a, 'click', function(e) { L.DomEvent.preventDefault(e); toggleSatelite(a); });
+    return c;
   }
 });
 new CtrlSatelite().addTo(map);
@@ -471,19 +467,15 @@ new CtrlSatelite().addTo(map);
 function toggleSatelite(a) {
   if (!a) a = document.querySelector('.ctrl-satelite a');
   if (!sateliteAtivo) {
-    map.removeLayer(tileNormal);
-    tileSatelite.addTo(map);
-    sateliteAtivo = true;
-    a.classList.add('sat-on');
+    map.removeLayer(tileNormal); tileSatelite.addTo(map);
+    sateliteAtivo = true; a.classList.add('sat-on');
     a.title = 'Mapa normal';
-    a.innerHTML = '<span>\uD83D\uDDFA</span><span class="ctrl-satelite-label">Normal</span>';
+    a.innerHTML = '<span>&#128506;</span><span class="ctrl-satelite-tip">Normal</span>';
   } else {
-    map.removeLayer(tileSatelite);
-    tileNormal.addTo(map);
-    sateliteAtivo = false;
-    a.classList.remove('sat-on');
-    a.title = 'Sat\u00e9lite';
-    a.innerHTML = '<span>\uD83D\uDEF0</span><span class="ctrl-satelite-label">Sat\u00e9lite</span>';
+    map.removeLayer(tileSatelite); tileNormal.addTo(map);
+    sateliteAtivo = false; a.classList.remove('sat-on');
+    a.title = 'Satélite';
+    a.innerHTML = '<span>&#128640;</span><span class="ctrl-satelite-tip">Satélite</span>';
   }
 }
 var groups={ALL:L.layerGroup()};
@@ -816,6 +808,10 @@ if (sessionStorage.getItem('autenticado') === '1') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
     document.getElementById('btn-vmd').style.display = 'inline-flex';
     document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
+  } else {
+    document.getElementById('btn-financeiro').style.display = 'none';
+    document.getElementById('btn-vmd').style.display = 'none';
+    document.getElementById('btn-fotos-zip').style.display = 'none';
   }
 }
 
