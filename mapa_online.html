@@ -733,6 +733,10 @@ if (sessionStorage.getItem('autenticado') === '1') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
     document.getElementById('btn-vmd').style.display = 'inline-flex';
     document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
+  } else {
+    document.getElementById('btn-financeiro').style.display = 'none';
+    document.getElementById('btn-vmd').style.display = 'none';
+    document.getElementById('btn-fotos-zip').style.display = 'none';
   }
 }
 
