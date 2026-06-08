@@ -95,6 +95,15 @@ header span { font-size:12px; color:#bbdefb; }
 footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-size:11px; color:#bbb; text-align:right; flex-shrink:0; }
 .leaflet-tooltip { background:#fff !important; border:1px solid #90caf9 !important; color:#1a237e !important; font-size:12px; border-radius:6px; padding:5px 8px; }
 .leaflet-tooltip-top:before { border-top-color:#90caf9 !important; }
+#btn-satelite {
+  background:#37474f; color:#fff; border:none; border-radius:8px;
+  padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+  transition:background 0.2s; flex-shrink:0;
+}
+#btn-satelite:hover { background:#546e7a; }
+#btn-satelite.ativo { background:#1565c0; }
+#btn-satelite.ativo:hover { background:#1976d2; }
 
 /* ── Tela de Login ── */
 #login-overlay {
@@ -339,6 +348,9 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
       &#128229; Download Planilhas 15min
     </button>
   </div>
+  <button id="btn-satelite" onclick="toggleSatelite()" title="Alternar vista satelite">
+    &#127758; Sat&#233;lite
+  </button>
   <input type="text" id="search-box" placeholder="&#128269; Buscar ID, rodovia..." oninput="searchPoints(this.value)">
 </div>
 <div id="map"></div>
@@ -401,8 +413,28 @@ var colorMode='st', lbFotos=[], lbIdx=0, carrFotos=[], carrIdx=0;
 var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
 var map = L.map('map').setView([-4.8,-39.5],7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19}).addTo(map);
+var tileNormal = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19});
+var tileSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {attribution:'© Esri, Maxar, Earthstar Geographics',maxZoom:19});
+tileNormal.addTo(map);
+var sateliteAtivo = false;
+function toggleSatelite() {
+  var btn = document.getElementById('btn-satelite');
+  if (!sateliteAtivo) {
+    map.removeLayer(tileNormal);
+    tileSatelite.addTo(map);
+    sateliteAtivo = true;
+    btn.classList.add('ativo');
+    btn.innerHTML = '&#127758; Normal';
+  } else {
+    map.removeLayer(tileSatelite);
+    tileNormal.addTo(map);
+    sateliteAtivo = false;
+    btn.classList.remove('ativo');
+    btn.innerHTML = '&#127758; Satélite';
+  }
+}
 var groups={ALL:L.layerGroup()};
 
 function corPonto(p){
@@ -733,10 +765,6 @@ if (sessionStorage.getItem('autenticado') === '1') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
     document.getElementById('btn-vmd').style.display = 'inline-flex';
     document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
-  } else {
-    document.getElementById('btn-financeiro').style.display = 'none';
-    document.getElementById('btn-vmd').style.display = 'none';
-    document.getElementById('btn-fotos-zip').style.display = 'none';
   }
 }
 
