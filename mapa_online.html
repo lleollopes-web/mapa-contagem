@@ -168,6 +168,8 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 #btn-vmd:hover { background:#f4511e; }
 #btn-fotos-zip { background:#ad1457; color:#fff; border-color:#ad1457; }
 #btn-fotos-zip:hover { background:#c2185b; }
+#btn-velocidades { background:#00695c; color:#fff; border-color:#00695c; }
+#btn-velocidades:hover { background:#00897b; }
 #painel-fin {
   position:absolute; top:110px; left:15px; width:780px; max-width:calc(100vw - 30px);
   background:#fff; border:1px solid #e0e0e0; border-radius:14px; z-index:1000;
@@ -275,49 +277,6 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   #print-area .fin-close,
   #print-area #btn-imprimir { display:none !important; }
 }
-
-.ctrl-satelite {
-  background: rgba(255,255,255,0.82);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(0,0,0,0.18);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-  margin-top: 8px !important;
-}
-.ctrl-satelite a {
-  display: flex !important;
-  align-items: center;
-  width: 32px !important;
-  height: 32px !important;
-  justify-content: center;
-  font-size: 17px !important;
-  color: #37474f !important;
-  text-decoration: none;
-  border-radius: 5px;
-  transition: background 0.18s, color 0.18s;
-  cursor: pointer;
-  position: relative;
-}
-.ctrl-satelite a:hover { background: rgba(21,101,192,0.12) !important; color: #1565c0 !important; }
-.ctrl-satelite a.sat-on { background: rgba(21,101,192,0.22) !important; color: #1565c0 !important; }
-.ctrl-satelite-tip {
-  position: absolute;
-  left: 38px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(40,40,40,0.85);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 5px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s;
-}
-.ctrl-satelite a:hover .ctrl-satelite-tip { opacity: 1; }
 </style>
 </head>
 <body>
@@ -380,6 +339,11 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
     </button>
     <button class="dl-btn dl-btn-zip" onclick="downloadZip(this)" title="ZIP com todos os xlsx dos pontos concluídos">
       &#128229; Download Planilhas 15min
+    </button>
+    <button class="dl-btn" id="btn-velocidades"
+            onclick="downloadVelocidades(this)"
+            title="Planilha de controle de velocidades por trecho">
+      &#128663; Controle de Velocidades
     </button>
   </div>
   <input type="text" id="search-box" placeholder="&#128269; Buscar ID, rodovia..." oninput="searchPoints(this.value)">
@@ -444,40 +408,8 @@ var colorMode='st', lbFotos=[], lbIdx=0, carrFotos=[], carrIdx=0;
 var activeGroup='ALL', allMarkers=[], tempLayer=null;
 
 var map = L.map('map').setView([-4.8,-39.5],7);
-var tileNormal = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  {attribution:'© OpenStreetMap © CartoDB', maxZoom:19});
-var tileSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'© Esri, Maxar, Earthstar Geographics', maxZoom:19});
-tileNormal.addTo(map);
-var sateliteAtivo = false;
-
-var CtrlSatelite = L.Control.extend({
-  options: { position: 'topleft' },
-  onAdd: function() {
-    var c = L.DomUtil.create('div', 'leaflet-bar leaflet-control ctrl-satelite');
-    var a = L.DomUtil.create('a', '', c);
-    a.href = '#'; a.title = 'Satélite';
-    a.innerHTML = '<span>&#128640;</span><span class="ctrl-satelite-tip">Satélite</span>';
-    L.DomEvent.on(a, 'click', function(e) { L.DomEvent.preventDefault(e); toggleSatelite(a); });
-    return c;
-  }
-});
-new CtrlSatelite().addTo(map);
-
-function toggleSatelite(a) {
-  if (!a) a = document.querySelector('.ctrl-satelite a');
-  if (!sateliteAtivo) {
-    map.removeLayer(tileNormal); tileSatelite.addTo(map);
-    sateliteAtivo = true; a.classList.add('sat-on');
-    a.title = 'Mapa normal';
-    a.innerHTML = '<span>&#128506;</span><span class="ctrl-satelite-tip">Normal</span>';
-  } else {
-    map.removeLayer(tileSatelite); tileNormal.addTo(map);
-    sateliteAtivo = false; a.classList.remove('sat-on');
-    a.title = 'Satélite';
-    a.innerHTML = '<span>&#128640;</span><span class="ctrl-satelite-tip">Satélite</span>';
-  }
-}
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CartoDB',maxZoom:19}).addTo(map);
 var groups={ALL:L.layerGroup()};
 
 function corPonto(p){
@@ -808,13 +740,37 @@ if (sessionStorage.getItem('autenticado') === '1') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
     document.getElementById('btn-vmd').style.display = 'inline-flex';
     document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
-  } else {
-    document.getElementById('btn-financeiro').style.display = 'none';
-    document.getElementById('btn-vmd').style.display = 'none';
-    document.getElementById('btn-fotos-zip').style.display = 'none';
   }
 }
 
+
+function downloadVelocidades(btn) {
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.innerHTML = '&#9203; Baixando...';
+  fetch(API_BASE + '/api/download/velocidades')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a   = document.createElement('a');
+      a.href  = url;
+      a.download = 'Velocidade_Trechos.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(e) { alert('Erro ao baixar planilha: ' + e.message); })
+    .finally(function() {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.innerHTML = orig;
+    });
+}
 
 function downloadVmd(btn) {
   var orig = btn.innerHTML;

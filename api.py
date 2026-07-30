@@ -1519,6 +1519,26 @@ def download_vmd_trechos():
         headers={"Content-Disposition": f"attachment; filename={nome}"}
     )
 
+@app.get("/api/download/velocidades")
+def download_velocidades():
+    """Faz download da planilha Velocidade - TRECHOS.xlsx direto do Google Drive."""
+    from fastapi.responses import StreamingResponse
+    FILE_ID = "1cr82t9tAPI8mG7Liu8UMcCcQhukXhPDf"
+    url = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
+    try:
+        req  = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=30)
+        dados = resp.read()
+    except Exception as e:
+        raise HTTPException(502, f"Erro ao baixar planilha do Drive: {e}")
+    from datetime import datetime as dt
+    nome = f"Velocidade_Trechos_{dt.now(BRASILIA).strftime('%d%m%Y')}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(dados),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
 @app.get("/api/status")
 def status():
     return {
