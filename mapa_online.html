@@ -171,10 +171,11 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 #btn-velocidades { background:#00695c; color:#fff; border-color:#00695c; }
 #btn-velocidades:hover { background:#00897b; }
 #painel-fin {
-  position:absolute; top:110px; left:15px; width:780px; max-width:calc(100vw - 30px);
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:94vw; max-width:1300px;
   background:#fff; border:1px solid #e0e0e0; border-radius:14px; z-index:1000;
   display:none; box-shadow:0 8px 32px rgba(0,0,0,0.18);
-  max-height:calc(100vh - 130px); overflow-y:auto;
+  max-height:90vh; overflow-y:auto; overflow-x:hidden;
 }
 .fin-header { background:linear-gradient(90deg,#880e4f,#c2185b); color:#fff;
   padding:14px 20px; border-radius:14px 14px 0 0; display:flex;
@@ -187,12 +188,12 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
 .fin-table td { padding:7px 10px; border-bottom:1px solid #f0e0e8; }
 .fin-table tr:nth-child(even) td { background:#fdf0f5; }
 .fin-table .col-tipo { text-align:left; font-weight:500; }
-.fin-table .col-val  { text-align:center; }
-.fin-table .col-tot  { text-align:center; font-weight:700; color:#880e4f; }
-.fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; text-align:center; vertical-align:middle; }
+.fin-table .col-val  { text-align:center; white-space:nowrap; }
+.fin-table .col-tot  { text-align:center; font-weight:700; color:#880e4f; white-space:nowrap; }
+.fin-row-total td { background:#c2185b !important; color:#fff; font-weight:700; text-align:center; vertical-align:middle; white-space:nowrap; }
 .fin-row-qtd  td { background:#f8bbd9; font-weight:700; text-align:center; vertical-align:middle; }
 .fin-row-qtd  td:first-child { text-align:left; }
-.fin-row-cpp  td { background:#f8bbd9; font-weight:700; text-align:center; vertical-align:middle; }
+.fin-row-cpp  td { background:#f8bbd9; font-weight:700; text-align:center; vertical-align:middle; white-space:nowrap; }
 .fin-row-cpp  td:first-child { text-align:left; }
 .fin-resumo { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
 .fin-card { background:linear-gradient(135deg,#880e4f,#c2185b); color:#fff;
@@ -221,7 +222,7 @@ footer { background:#fff; border-top:1px solid #e0e0e0; padding:5px 20px; font-s
   .fin-table { font-size:10px; }
   .fin-table th { padding:5px 4px; font-size:10px; }
   .fin-table td { padding:4px 4px; }
-  #painel-fin { width:calc(100vw - 20px); left:10px; right:10px; top:100px; }
+  #painel-fin { width:calc(100vw - 10px); left:5px; right:5px; top:50%; transform:translate(0,-50%); }
   .fin-header h3 { font-size:12px; }
   .fin-body { padding:10px 10px; }
   .fin-resumo { grid-template-columns:1fr; gap:8px; }
