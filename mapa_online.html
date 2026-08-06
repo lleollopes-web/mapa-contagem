@@ -714,6 +714,10 @@ function fazerLogin() {
       document.getElementById('btn-financeiro').style.display = 'inline-flex';
       document.getElementById('btn-vmd').style.display = 'inline-flex';
       document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
+    } else if (usuario.perfil === 'comol') {
+      document.getElementById('btn-financeiro').style.display = 'none';
+      document.getElementById('btn-vmd').style.display = 'inline-flex';
+      document.getElementById('btn-fotos-zip').style.display = 'none';
     } else {
       document.getElementById('btn-financeiro').style.display = 'none';
       document.getElementById('btn-vmd').style.display = 'none';
@@ -741,6 +745,10 @@ if (sessionStorage.getItem('autenticado') === '1') {
     document.getElementById('btn-financeiro').style.display = 'inline-flex';
     document.getElementById('btn-vmd').style.display = 'inline-flex';
     document.getElementById('btn-fotos-zip').style.display = 'inline-flex';
+  } else if (perfilAtual === 'comol') {
+    document.getElementById('btn-financeiro').style.display = 'none';
+    document.getElementById('btn-vmd').style.display = 'inline-flex';
+    document.getElementById('btn-fotos-zip').style.display = 'none';
   } else {
     document.getElementById('btn-financeiro').style.display = 'none';
     document.getElementById('btn-vmd').style.display = 'none';
